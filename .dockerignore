@@ -1,0 +1,10 @@
+node_modules
+.npm-cache
+.expo
+.git
+**/.env
+**/dist
+mobile/.expo
+mobile/android
+mobile/ios
+

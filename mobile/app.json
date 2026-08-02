@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Nhập Gỗ",
+    "slug": "app-nhap-go",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "appnhapgo",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F6F3"
+    },
+    "plugins": [
+      "expo-document-picker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Cho phép Nhập Gỗ sử dụng camera để chụp cây gỗ.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.kyslab.appnhapgo",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#F4F6F3",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

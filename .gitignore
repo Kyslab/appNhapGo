@@ -1,0 +1,15 @@
+node_modules/
+.npm-cache/
+.expo/
+.env
+.env.*
+!.env.example
+dist/
+coverage/
+*.log
+.DS_Store
+api/uploads/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+
