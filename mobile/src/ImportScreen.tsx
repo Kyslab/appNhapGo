@@ -59,7 +59,8 @@ function emptyDetails(): ImportDetailsInput {
     woodPickupLocation: "",
     intakeStartDate: localDate(),
     totalQuantity: "",
-    quantityUnit: "logs"
+    quantityUnit: "logs",
+    declaredVolumeCbm: ""
   };
 }
 
@@ -490,6 +491,13 @@ function ShipmentSummarySection({
         onChange={(value) => onChange("quantityUnit", value)}
         value={details.quantityUnit}
       />
+      <FormField
+        keyboardType="decimal-pad"
+        label="Tổng khối lượng (CBM)"
+        onChangeText={(value) => onChange("declaredVolumeCbm", value)}
+        placeholder="361,955"
+        value={details.declaredVolumeCbm}
+      />
     </FormSection>
   );
 }
@@ -639,6 +647,11 @@ function ImportSummary({ item }: { item: WoodImport }) {
             quantityUnitLabel(item.quantityUnit)}
         </Text>
       ) : null}
+      {item.declaredVolumeCbm !== null ? (
+        <Text style={styles.quantityText}>
+          {"Khối lượng lô: " + formatVolume(item.declaredVolumeCbm)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -649,7 +662,8 @@ function validateDetails(details: ImportDetailsInput): string | null {
     [details.contactPhone, "điện thoại liên hệ"],
     [details.woodSpecies, "loại gỗ"],
     [details.intakeStartDate, "ngày bắt đầu nhập"],
-    [details.totalQuantity, "tổng số lượng lô hàng"]
+    [details.totalQuantity, "tổng số lượng lô hàng"],
+    [details.declaredVolumeCbm, "tổng khối lượng CBM"]
   ];
 
   if (details.shipmentType === "container") {
@@ -692,6 +706,15 @@ function validateDetails(details: ImportDetailsInput): string | null {
 
   if (!/^\d+$/.test(details.totalQuantity) || Number(details.totalQuantity) <= 0) {
     return "Tổng số lượng phải là số nguyên lớn hơn 0.";
+  }
+
+  const normalizedVolume = details.declaredVolumeCbm.replace(",", ".");
+
+  if (
+    !/^\d+(?:\.\d+)?$/.test(normalizedVolume) ||
+    Number(normalizedVolume) <= 0
+  ) {
+    return "Tổng khối lượng CBM phải là số lớn hơn 0.";
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(details.intakeStartDate)) {

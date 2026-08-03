@@ -16,7 +16,8 @@ describe("parseImportDetails", () => {
       woodPickupLocation: "Cảng Quy Nhơn",
       intakeStartDate: "2026-08-03",
       totalQuantity: "120",
-      quantityUnit: "logs"
+      quantityUnit: "logs",
+      declaredVolumeCbm: "361,955"
     });
 
     assert.equal(details.shipmentType, "loose");
@@ -25,6 +26,7 @@ describe("parseImportDetails", () => {
     assert.equal(details.woodPickupLocation, "Cảng Quy Nhơn");
     assert.equal(details.container20Count, 0);
     assert.equal(details.totalQuantity, 120);
+    assert.equal(details.declaredVolumeCbm, 361.955);
   });
 
   it("rejects a loose shipment without a vessel name", () => {
@@ -56,7 +58,8 @@ describe("parseImportDetails", () => {
       containerPickupLocation: "Cảng Cát Lái",
       intakeStartDate: "2026-08-03",
       totalQuantity: "83",
-      quantityUnit: "logs"
+      quantityUnit: "logs",
+      declaredVolumeCbm: "361.955"
     });
 
     assert.equal(details.ownerName, "Chủ hàng A");
@@ -64,6 +67,26 @@ describe("parseImportDetails", () => {
     assert.equal(details.container40Count, 2);
     assert.equal(details.totalQuantity, 83);
     assert.equal(details.quantityUnit, "logs");
+    assert.equal(details.declaredVolumeCbm, 361.955);
+  });
+
+  it("rejects a non-positive declared volume", () => {
+    assert.throws(
+      () =>
+        parseImportDetails({
+          shipmentType: "loose",
+          ownerName: "Chủ hàng B",
+          contactPhone: "0907654321",
+          vesselName: "Tàu Đại Dương",
+          woodSpecies: "Padouk",
+          woodPickupLocation: "Cảng Quy Nhơn",
+          intakeStartDate: "2026-08-03",
+          totalQuantity: "120",
+          quantityUnit: "logs",
+          declaredVolumeCbm: "0"
+        }),
+      ImportDetailsError
+    );
   });
 
   it("rejects a container shipment without a container", () => {

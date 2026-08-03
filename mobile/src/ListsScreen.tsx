@@ -700,6 +700,9 @@ function ImportRow({
             " · Tổng " +
             formatImportQuantity(item)}
         </Text>
+        <Text style={styles.importMeta} numberOfLines={1}>
+          {"Tổng khối lượng: " + formatDeclaredVolume(item)}
+        </Text>
         <Text style={styles.importProgressText}>
           {item.receivedLogs + "/" + item.totalLogs + " cây đã nhận"}
         </Text>
@@ -740,6 +743,10 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
           label="Tổng lô"
           value={formatImportQuantity(item)}
         />
+        <ShipmentRow
+          label="Khối lượng"
+          value={formatDeclaredVolume(item)}
+        />
       </View>
     );
   }
@@ -774,6 +781,10 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
         label="Tổng lô"
         value={formatImportQuantity(item)}
       />
+      <ShipmentRow
+        label="Khối lượng"
+        value={formatDeclaredVolume(item)}
+      />
     </View>
   );
 }
@@ -801,6 +812,12 @@ function formatImportQuantity(item: WoodImport): string {
   return item.totalQuantity !== null && item.quantityUnit
     ? item.totalQuantity + " " + quantityUnitLabel(item.quantityUnit)
     : "--";
+}
+
+function formatDeclaredVolume(item: WoodImport): string {
+  return item.declaredVolumeCbm === null
+    ? "--"
+    : formatMetric(item.declaredVolumeCbm, "CBM");
 }
 
 function formatMetric(value: number | null, suffix: string): string {
@@ -892,7 +909,7 @@ const styles = StyleSheet.create({
     height: 10
   },
   importRow: {
-    minHeight: 154,
+    minHeight: 170,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,

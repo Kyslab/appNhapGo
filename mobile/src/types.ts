@@ -16,6 +16,7 @@ export type ImportDetailsInput = {
   intakeStartDate: string;
   totalQuantity: string;
   quantityUnit: QuantityUnit;
+  declaredVolumeCbm: string;
 };
 
 export type WoodLog = {
@@ -59,6 +60,7 @@ export type WoodImport = {
   intakeStartDate: string | null;
   totalQuantity: number | null;
   quantityUnit: QuantityUnit | null;
+  declaredVolumeCbm: number | null;
   totalLogs: number;
   receivedLogs: number;
   pendingLogs: number;

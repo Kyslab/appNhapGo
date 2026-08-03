@@ -157,6 +157,7 @@ function mapImport(row: DatabaseRow) {
     intakeStartDate: row.intake_start_date,
     totalQuantity: asNumber(row.total_quantity),
     quantityUnit: row.quantity_unit,
+    declaredVolumeCbm: asNumber(row.declared_volume_cbm),
     totalLogs,
     receivedLogs,
     pendingLogs: Math.max(totalLogs - receivedLogs, 0),
@@ -319,11 +320,12 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
           wood_pickup_location,
           intake_start_date,
           total_quantity,
-          quantity_unit
+          quantity_unit,
+          declared_volume_cbm
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
+          $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
         )
         RETURNING id
       `,
@@ -349,7 +351,8 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
         details.woodPickupLocation,
         details.intakeStartDate,
         details.totalQuantity,
-        details.quantityUnit
+        details.quantityUnit,
+        details.declaredVolumeCbm
       ]
     );
     const importId = importResult.rows[0].id as string;

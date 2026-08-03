@@ -84,6 +84,7 @@ export async function importWorkbook(
   form.append("intakeStartDate", details.intakeStartDate);
   form.append("totalQuantity", details.totalQuantity);
   form.append("quantityUnit", details.quantityUnit);
+  form.append("declaredVolumeCbm", details.declaredVolumeCbm);
 
   if (details.shipmentType === "container") {
     form.append("lotName", details.lotName);

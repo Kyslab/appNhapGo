@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS wood_imports (
   intake_start_date date,
   total_quantity integer CHECK (total_quantity > 0),
   quantity_unit text CHECK (quantity_unit IN ('logs', 'packages', 'boxes')),
+  declared_volume_cbm numeric(16, 3) CHECK (declared_volume_cbm > 0),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -47,7 +48,9 @@ ALTER TABLE wood_imports
   ADD COLUMN IF NOT EXISTS intake_start_date date,
   ADD COLUMN IF NOT EXISTS total_quantity integer CHECK (total_quantity > 0),
   ADD COLUMN IF NOT EXISTS quantity_unit text
-    CHECK (quantity_unit IN ('logs', 'packages', 'boxes'));
+    CHECK (quantity_unit IN ('logs', 'packages', 'boxes')),
+  ADD COLUMN IF NOT EXISTS declared_volume_cbm numeric(16, 3)
+    CHECK (declared_volume_cbm > 0);
 
 CREATE TABLE IF NOT EXISTS wood_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -15,6 +15,7 @@ export type ImportDetails = {
   intakeStartDate: string | null;
   totalQuantity: number | null;
   quantityUnit: QuantityUnit | null;
+  declaredVolumeCbm: number | null;
 };
 
 export class ImportDetailsError extends Error {
@@ -78,6 +79,21 @@ function positiveInteger(
   return value;
 }
 
+function positiveDecimal(
+  body: Record<string, unknown>,
+  key: string,
+  label: string
+): number {
+  const raw = String(body[key] ?? "").trim().replace(",", ".");
+  const value = Number(raw);
+
+  if (!raw || !Number.isFinite(value) || value <= 0) {
+    throw new ImportDetailsError(label + " phải là số lớn hơn 0.");
+  }
+
+  return value;
+}
+
 function validDate(body: Record<string, unknown>, key: string): string {
   const value = requiredText(body, key, "ngày bắt đầu nhập", 10);
   const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -126,6 +142,11 @@ export function parseImportDetails(value: unknown): ImportDetails {
     "totalQuantity",
     "Tổng số lượng"
   );
+  const declaredVolumeCbm = positiveDecimal(
+    body,
+    "declaredVolumeCbm",
+    "Tổng khối lượng CBM"
+  );
   const quantityUnit = String(body.quantityUnit ?? "").trim();
 
   if (!new Set(["logs", "packages", "boxes"]).has(quantityUnit)) {
@@ -150,7 +171,8 @@ export function parseImportDetails(value: unknown): ImportDetails {
       ),
       intakeStartDate,
       totalQuantity,
-      quantityUnit: quantityUnit as QuantityUnit
+      quantityUnit: quantityUnit as QuantityUnit,
+      declaredVolumeCbm
     };
   }
 
@@ -186,6 +208,7 @@ export function parseImportDetails(value: unknown): ImportDetails {
     woodPickupLocation: null,
     intakeStartDate,
     totalQuantity,
-    quantityUnit: quantityUnit as QuantityUnit
+    quantityUnit: quantityUnit as QuantityUnit,
+    declaredVolumeCbm
   };
 }
