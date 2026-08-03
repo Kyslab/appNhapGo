@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import type { DocumentPickerAsset } from "expo-document-picker";
+import { File, UploadType } from "expo-file-system";
 import type { PhotoFile, WoodImport, WoodLog } from "./types";
 
 const emulatorUrl = Platform.OS === "android"
@@ -40,7 +41,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  const text = await response.text();
+  return parseResponse<T>(await response.text(), response.ok);
+}
+
+function parseResponse<T>(text: string, ok: boolean): T {
   let body: { message?: string } & T;
 
   try {
@@ -49,7 +53,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError("Máy chủ trả về dữ liệu không hợp lệ.");
   }
 
-  if (!response.ok) {
+  if (!ok) {
     throw new ApiError(body.message || "Yêu cầu không thành công.");
   }
 
@@ -100,29 +104,36 @@ export async function getImportLogs(
 }
 
 export async function uploadLogPhoto(logId: string, photo: PhotoFile) {
-  const form = new FormData();
-  form.append(
-    "photo",
-    {
-      uri: photo.uri,
-      name: photo.name,
-      type: photo.mimeType
-    } as unknown as Blob
-  );
-  form.append("capturedAt", new Date().toISOString());
+  const file = new File(photo.uri);
+  let result;
 
-  return request<{
+  try {
+    result = await file.upload(
+      API_URL + "/api/logs/" + encodeURIComponent(logId) + "/photos",
+      {
+        fieldName: "photo",
+        headers: apiHeaders(),
+        httpMethod: "POST",
+        mimeType: photo.mimeType,
+        parameters: { capturedAt: new Date().toISOString() },
+        uploadType: UploadType.MULTIPART
+      }
+    );
+  } catch (caught) {
+    console.error("Photo upload failed before receiving a response", caught);
+    throw new ApiError(
+      "Không gửi được ảnh lên máy chủ. Kiểm tra mạng Wi-Fi rồi thử lại."
+    );
+  }
+
+  return parseResponse<{
     message: string;
     photoId: string;
     photoCount: number;
     status: "received";
-  }>("/api/logs/" + encodeURIComponent(logId) + "/photos", {
-    method: "POST",
-    body: form
-  });
+  }>(result.body, result.status >= 200 && result.status < 300);
 }
 
 export function photoUrl(photoId: string): string {
   return API_URL + "/api/photos/" + encodeURIComponent(photoId);
 }
-
