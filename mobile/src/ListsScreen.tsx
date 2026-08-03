@@ -10,7 +10,8 @@ import {
 import {
   ArrowLeft,
   ChevronRight,
-  ListChecks
+  Container,
+  PackageOpen
 } from "lucide-react-native";
 import {
   ApiError,
@@ -111,9 +112,10 @@ export function ListsScreen({ refreshKey }: { refreshKey: number }) {
               />
               <View style={styles.detailIdentity}>
                 <Text style={styles.detailCode} numberOfLines={1}>
-                  {selectedImport.listCode}
+                  {selectedImport.lotName || selectedImport.listCode}
                 </Text>
                 <Text style={styles.detailFile} numberOfLines={1}>
+                  {selectedImport.lotName ? selectedImport.listCode + " · " : ""}
                   {selectedImport.originalFilename}
                 </Text>
               </View>
@@ -132,6 +134,7 @@ export function ListsScreen({ refreshKey }: { refreshKey: number }) {
                 value={selectedImport.pendingLogs}
               />
             </View>
+            <ShipmentInformation item={selectedImport} />
             <SegmentedFilter value={filter} onChange={setFilter} />
             {error ? (
               <Notice title="Không tải được dữ liệu" tone="error">
@@ -186,6 +189,8 @@ function ImportRow({
 }) {
   const progress =
     item.totalLogs === 0 ? 0 : item.receivedLogs / item.totalLogs;
+  const ShipmentIcon =
+    item.shipmentType === "container" ? Container : PackageOpen;
 
   return (
     <Pressable
@@ -197,11 +202,21 @@ function ImportRow({
       ]}
     >
       <View style={styles.listIcon}>
-        <ListChecks color={colors.primary} size={23} />
+        <ShipmentIcon color={colors.primary} size={23} />
       </View>
       <View style={styles.importBody}>
         <Text style={styles.importCode} numberOfLines={1}>
-          {item.listCode}
+          {item.lotName || item.listCode}
+        </Text>
+        <Text style={styles.importMeta}>
+          {item.shipmentType === "container"
+            ? item.listCode +
+              " · " +
+              item.container20Count +
+              "C20 · " +
+              item.container40Count +
+              "C40"
+            : item.listCode + " · Hàng rời"}
         </Text>
         <Text style={styles.importMeta}>
           {item.receivedLogs + "/" + item.totalLogs + " cây đã nhận"}
@@ -218,6 +233,70 @@ function ImportRow({
       <ChevronRight color={colors.muted} size={22} />
     </Pressable>
   );
+}
+
+function ShipmentInformation({ item }: { item: WoodImport }) {
+  if (item.shipmentType !== "container") {
+    return (
+      <View style={styles.shipmentBand}>
+        <ShipmentRow label="Hình thức nhập" value="Hàng rời" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.shipmentBand}>
+      <Text style={styles.shipmentHeading}>Thông tin lô hàng</Text>
+      <ShipmentRow
+        label="Chủ hàng"
+        value={(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
+      />
+      <ShipmentRow label="Loại gỗ" value={item.woodSpecies || "--"} />
+      <ShipmentRow
+        label="Container"
+        value={
+          item.container20Count +
+          " Cont 20' · " +
+          item.container40Count +
+          " Cont 40'"
+        }
+      />
+      <ShipmentRow
+        label="Nơi lấy cont"
+        value={item.containerPickupLocation || "--"}
+      />
+      <ShipmentRow
+        label="Ngày bắt đầu"
+        value={formatImportDate(item.intakeStartDate)}
+      />
+      <ShipmentRow
+        label="Tổng lô"
+        value={
+          item.totalQuantity && item.quantityUnit
+            ? item.totalQuantity + " " + quantityUnitLabel(item.quantityUnit)
+            : "--"
+        }
+      />
+    </View>
+  );
+}
+
+function ShipmentRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.shipmentRow}>
+      <Text style={styles.shipmentTitle}>{label}</Text>
+      <Text style={styles.shipmentValue}>{value}</Text>
+    </View>
+  );
+}
+
+function quantityUnitLabel(value: "logs" | "packages" | "boxes"): string {
+  return { logs: "lóng", packages: "kiện", boxes: "hộp" }[value];
+}
+
+function formatImportDate(value: string | null): string {
+  const parts = value?.slice(0, 10).split("-");
+  return parts?.length === 3 ? parts.reverse().join("/") : "--";
 }
 
 function SummaryMetric({ label, value }: { label: string; value: number }) {
@@ -377,6 +456,43 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: colors.muted,
     fontSize: 10,
+    letterSpacing: 0
+  },
+  shipmentBand: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    gap: 7
+  },
+  shipmentHeading: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0,
+    paddingHorizontal: 12
+  },
+  shipmentRow: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 12
+  },
+  shipmentTitle: {
+    width: 94,
+    color: colors.muted,
+    fontSize: 11,
+    letterSpacing: 0
+  },
+  shipmentValue: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "700",
+    textAlign: "right",
     letterSpacing: 0
   },
   segmented: {

@@ -11,8 +11,39 @@ CREATE TABLE IF NOT EXISTS wood_imports (
   imported_rows integer NOT NULL DEFAULT 0,
   duplicate_rows integer NOT NULL DEFAULT 0,
   total_volume_cbm numeric(16, 6) NOT NULL DEFAULT 0,
+  shipment_type text NOT NULL DEFAULT 'loose'
+    CHECK (shipment_type IN ('container', 'loose')),
+  owner_name text,
+  contact_phone text,
+  lot_name text,
+  wood_species text,
+  container_20_count integer NOT NULL DEFAULT 0
+    CHECK (container_20_count >= 0),
+  container_40_count integer NOT NULL DEFAULT 0
+    CHECK (container_40_count >= 0),
+  container_pickup_location text,
+  intake_start_date date,
+  total_quantity integer CHECK (total_quantity > 0),
+  quantity_unit text CHECK (quantity_unit IN ('logs', 'packages', 'boxes')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE wood_imports
+  ADD COLUMN IF NOT EXISTS shipment_type text NOT NULL DEFAULT 'loose'
+    CHECK (shipment_type IN ('container', 'loose')),
+  ADD COLUMN IF NOT EXISTS owner_name text,
+  ADD COLUMN IF NOT EXISTS contact_phone text,
+  ADD COLUMN IF NOT EXISTS lot_name text,
+  ADD COLUMN IF NOT EXISTS wood_species text,
+  ADD COLUMN IF NOT EXISTS container_20_count integer NOT NULL DEFAULT 0
+    CHECK (container_20_count >= 0),
+  ADD COLUMN IF NOT EXISTS container_40_count integer NOT NULL DEFAULT 0
+    CHECK (container_40_count >= 0),
+  ADD COLUMN IF NOT EXISTS container_pickup_location text,
+  ADD COLUMN IF NOT EXISTS intake_start_date date,
+  ADD COLUMN IF NOT EXISTS total_quantity integer CHECK (total_quantity > 0),
+  ADD COLUMN IF NOT EXISTS quantity_unit text
+    CHECK (quantity_unit IN ('logs', 'packages', 'boxes'));
 
 CREATE TABLE IF NOT EXISTS wood_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,4 +86,3 @@ CREATE TABLE IF NOT EXISTS wood_log_photos (
 
 CREATE INDEX IF NOT EXISTS wood_log_photos_log_id_idx
   ON wood_log_photos (log_id, created_at DESC);
-

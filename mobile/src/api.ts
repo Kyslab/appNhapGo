@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { File, UploadType } from "expo-file-system";
 import type {
+  ImportDetailsInput,
   PhotoFile,
   WarehouseOverview,
   WoodImport,
@@ -71,8 +72,26 @@ export async function getImports(): Promise<WoodImport[]> {
   return result.imports;
 }
 
-export async function importWorkbook(asset: DocumentPickerAsset) {
+export async function importWorkbook(
+  asset: DocumentPickerAsset,
+  details: ImportDetailsInput
+) {
   const form = new FormData();
+  form.append("shipmentType", details.shipmentType);
+
+  if (details.shipmentType === "container") {
+    form.append("ownerName", details.ownerName);
+    form.append("contactPhone", details.contactPhone);
+    form.append("lotName", details.lotName);
+    form.append("woodSpecies", details.woodSpecies);
+    form.append("container20Count", details.container20Count);
+    form.append("container40Count", details.container40Count);
+    form.append("containerPickupLocation", details.containerPickupLocation);
+    form.append("intakeStartDate", details.intakeStartDate);
+    form.append("totalQuantity", details.totalQuantity);
+    form.append("quantityUnit", details.quantityUnit);
+  }
+
   form.append(
     "file",
     {

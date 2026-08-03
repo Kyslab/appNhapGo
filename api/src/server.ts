@@ -13,6 +13,10 @@ import {
   parseWorkbook,
   WorkbookImportError
 } from "./importer.js";
+import {
+  ImportDetailsError,
+  parseImportDetails
+} from "./import-details.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -140,6 +144,17 @@ function mapImport(row: DatabaseRow) {
     importedRows: asNumber(row.imported_rows) ?? 0,
     duplicateRows: asNumber(row.duplicate_rows) ?? 0,
     totalVolumeCbm: asNumber(row.total_volume_cbm) ?? 0,
+    shipmentType: row.shipment_type,
+    ownerName: row.owner_name,
+    contactPhone: row.contact_phone,
+    lotName: row.lot_name,
+    woodSpecies: row.wood_species,
+    container20Count: asNumber(row.container_20_count) ?? 0,
+    container40Count: asNumber(row.container_40_count) ?? 0,
+    containerPickupLocation: row.container_pickup_location,
+    intakeStartDate: row.intake_start_date,
+    totalQuantity: asNumber(row.total_quantity),
+    quantityUnit: row.quantity_unit,
     totalLogs,
     receivedLogs,
     pendingLogs: Math.max(totalLogs - receivedLogs, 0),
@@ -253,7 +268,11 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
     return;
   }
 
-  const parsed = await parseWorkbook(request.file.buffer, request.file.originalname);
+  const details = parseImportDetails(request.body);
+  const parsed = await parseWorkbook(
+    request.file.buffer,
+    request.file.originalname
+  );
   const client = await pool.connect();
 
   try {
@@ -285,9 +304,23 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
           total_rows,
           imported_rows,
           duplicate_rows,
-          total_volume_cbm
+          total_volume_cbm,
+          shipment_type,
+          owner_name,
+          contact_phone,
+          lot_name,
+          wood_species,
+          container_20_count,
+          container_40_count,
+          container_pickup_location,
+          intake_start_date,
+          total_quantity,
+          quantity_unit
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+        )
         RETURNING id
       `,
       [
@@ -299,7 +332,18 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
         parsed.totalRows,
         parsed.logs.length,
         parsed.duplicateRows,
-        parsed.totalVolumeCbm
+        parsed.totalVolumeCbm,
+        details.shipmentType,
+        details.ownerName,
+        details.contactPhone,
+        details.lotName,
+        details.woodSpecies,
+        details.container20Count,
+        details.container40Count,
+        details.containerPickupLocation,
+        details.intakeStartDate,
+        details.totalQuantity,
+        details.quantityUnit
       ]
     );
     const importId = importResult.rows[0].id as string;
@@ -557,7 +601,10 @@ app.use(
       return;
     }
 
-    if (error instanceof WorkbookImportError) {
+    if (
+      error instanceof WorkbookImportError ||
+      error instanceof ImportDetailsError
+    ) {
       response.status(400).json({ message: error.message });
       return;
     }

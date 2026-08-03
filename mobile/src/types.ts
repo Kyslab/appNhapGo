@@ -1,4 +1,20 @@
 export type LogStatus = "pending" | "received";
+export type ShipmentType = "container" | "loose";
+export type QuantityUnit = "logs" | "packages" | "boxes";
+
+export type ImportDetailsInput = {
+  shipmentType: ShipmentType;
+  ownerName: string;
+  contactPhone: string;
+  lotName: string;
+  woodSpecies: string;
+  container20Count: string;
+  container40Count: string;
+  containerPickupLocation: string;
+  intakeStartDate: string;
+  totalQuantity: string;
+  quantityUnit: QuantityUnit;
+};
 
 export type WoodLog = {
   id: string;
@@ -28,6 +44,17 @@ export type WoodImport = {
   importedRows: number;
   duplicateRows: number;
   totalVolumeCbm: number;
+  shipmentType: ShipmentType;
+  ownerName: string | null;
+  contactPhone: string | null;
+  lotName: string | null;
+  woodSpecies: string | null;
+  container20Count: number;
+  container40Count: number;
+  containerPickupLocation: string | null;
+  intakeStartDate: string | null;
+  totalQuantity: number | null;
+  quantityUnit: QuantityUnit | null;
   totalLogs: number;
   receivedLogs: number;
   pendingLogs: number;
