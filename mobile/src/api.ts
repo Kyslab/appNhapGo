@@ -142,17 +142,21 @@ export async function getLogPhotos(logId: string): Promise<WoodLogPhoto[]> {
   return result.photos;
 }
 
-export async function uploadLogPhoto(logId: string, photo: PhotoFile) {
+async function sendPhoto(
+  path: string,
+  httpMethod: "POST" | "PUT",
+  photo: PhotoFile
+) {
   const file = new File(photo.uri);
   let result;
 
   try {
     result = await file.upload(
-      API_URL + "/api/logs/" + encodeURIComponent(logId) + "/photos",
+      API_URL + path,
       {
         fieldName: "photo",
         headers: apiHeaders(),
-        httpMethod: "POST",
+        httpMethod,
         mimeType: photo.mimeType,
         parameters: { capturedAt: new Date().toISOString() },
         uploadType: UploadType.MULTIPART
@@ -169,8 +173,35 @@ export async function uploadLogPhoto(logId: string, photo: PhotoFile) {
     message: string;
     photoId: string;
     photoCount: number;
+    latestPhotoId?: string;
     status: "received";
   }>(result.body, result.status >= 200 && result.status < 300);
+}
+
+export async function uploadLogPhoto(logId: string, photo: PhotoFile) {
+  return sendPhoto(
+    "/api/logs/" + encodeURIComponent(logId) + "/photos",
+    "POST",
+    photo
+  );
+}
+
+export async function replaceLogPhoto(photoId: string, photo: PhotoFile) {
+  return sendPhoto(
+    "/api/photos/" + encodeURIComponent(photoId),
+    "PUT",
+    photo
+  );
+}
+
+export async function deleteLogPhoto(photoId: string) {
+  return request<{
+    message: string;
+    deletedPhotoId: string;
+    photoCount: number;
+    latestPhotoId: string | null;
+    status: "pending" | "received";
+  }>("/api/photos/" + encodeURIComponent(photoId), { method: "DELETE" });
 }
 
 export function photoUrl(photoId: string): string {

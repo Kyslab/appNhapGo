@@ -79,14 +79,25 @@ export async function storeCapturedPhoto(photoId: string, uri: string) {
   return destination.uri;
 }
 
+export function removeStoredPhoto(photoId: string) {
+  downloads.delete(photoId);
+  const stored = localPhoto(photoId);
+
+  if (stored.exists) {
+    stored.delete();
+  }
+}
+
 export function PhotoImage({
   accessibilityLabel,
   photoId,
+  revision = 0,
   resizeMode = "cover",
   style
 }: {
   accessibilityLabel?: string;
   photoId: string;
+  revision?: number;
   resizeMode?: ImageProps["resizeMode"];
   style: StyleProp<ViewStyle>;
 }) {
@@ -114,13 +125,14 @@ export function PhotoImage({
     return () => {
       active = false;
     };
-  }, [photoId]);
+  }, [photoId, revision]);
 
   return (
     <View style={[style, styles.frame]}>
       {uri && !failed ? (
         <Image
           accessibilityLabel={accessibilityLabel}
+          key={photoId + ":" + revision}
           onError={() => setFailed(true)}
           resizeMode={resizeMode}
           source={{ uri }}

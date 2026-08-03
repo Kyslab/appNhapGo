@@ -552,7 +552,19 @@ app.post(
         [request.params.id, capturedAt]
       );
       const photoCountResult = await client.query(
-        "SELECT count(*)::int AS count FROM wood_log_photos WHERE log_id = $1",
+        `
+          SELECT
+            count(*)::int AS count,
+            (
+              SELECT id
+              FROM wood_log_photos
+              WHERE log_id = $1
+              ORDER BY captured_at DESC, created_at DESC
+              LIMIT 1
+            ) AS latest_photo_id
+          FROM wood_log_photos
+          WHERE log_id = $1
+        `,
         [request.params.id]
       );
       await client.query("COMMIT");
@@ -563,6 +575,7 @@ app.post(
           : "Ảnh này đã được lưu trước đó.",
         photoId,
         photoCount: Number(photoCountResult.rows[0].count),
+        latestPhotoId: photoCountResult.rows[0].latest_photo_id,
         status: "received"
       });
     } catch (error) {
@@ -573,6 +586,171 @@ app.post(
     }
   }
 );
+
+app.put(
+  "/api/photos/:id",
+  photoUpload.single("photo"),
+  async (request, response) => {
+    if (!request.file) {
+      response.status(400).json({ message: "Vui lòng chụp hoặc chọn một ảnh." });
+      return;
+    }
+
+    const client = await pool.connect();
+    const sha256 = createHash("sha256").update(request.file.buffer).digest("hex");
+    const requestedDate = new Date(String(request.body.capturedAt ?? ""));
+    const capturedAt = Number.isNaN(requestedDate.getTime())
+      ? new Date()
+      : requestedDate;
+
+    try {
+      await client.query("BEGIN");
+      const photoResult = await client.query(
+        "SELECT log_id FROM wood_log_photos WHERE id = $1 FOR UPDATE",
+        [request.params.id]
+      );
+      const logId = photoResult.rows[0]?.log_id as string | undefined;
+
+      if (!logId) {
+        await client.query("ROLLBACK");
+        response.status(404).json({ message: "Không tìm thấy ảnh cần thay." });
+        return;
+      }
+
+      const duplicateResult = await client.query(
+        `
+          SELECT id
+          FROM wood_log_photos
+          WHERE log_id = $1 AND sha256 = $2 AND id <> $3
+        `,
+        [logId, sha256, request.params.id]
+      );
+
+      if (duplicateResult.rows[0]) {
+        await client.query("ROLLBACK");
+        response.status(409).json({
+          message: "Ảnh mới đã tồn tại trong cây gỗ này."
+        });
+        return;
+      }
+
+      await client.query(
+        `
+          UPDATE wood_log_photos
+          SET
+            photo_data = $2,
+            mime_type = $3,
+            original_filename = $4,
+            byte_size = $5,
+            sha256 = $6,
+            captured_at = $7
+          WHERE id = $1
+        `,
+        [
+          request.params.id,
+          request.file.buffer,
+          request.file.mimetype,
+          request.file.originalname,
+          request.file.size,
+          sha256,
+          capturedAt
+        ]
+      );
+      await client.query(
+        `
+          UPDATE wood_logs
+          SET
+            status = 'received',
+            received_at = COALESCE(received_at, $2),
+            updated_at = now()
+          WHERE id = $1
+        `,
+        [logId, capturedAt]
+      );
+      const countResult = await client.query(
+        "SELECT count(*)::int AS count FROM wood_log_photos WHERE log_id = $1",
+        [logId]
+      );
+      await client.query("COMMIT");
+
+      response.json({
+        message: "Đã thay ảnh cây gỗ.",
+        photoId: request.params.id,
+        photoCount: Number(countResult.rows[0].count),
+        latestPhotoId: request.params.id,
+        status: "received"
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+);
+
+app.delete("/api/photos/:id", async (request, response) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    const photoResult = await client.query(
+      "SELECT log_id FROM wood_log_photos WHERE id = $1 FOR UPDATE",
+      [request.params.id]
+    );
+    const logId = photoResult.rows[0]?.log_id as string | undefined;
+
+    if (!logId) {
+      await client.query("ROLLBACK");
+      response.status(404).json({ message: "Không tìm thấy ảnh cần xóa." });
+      return;
+    }
+
+    await client.query("DELETE FROM wood_log_photos WHERE id = $1", [
+      request.params.id
+    ]);
+    const remainingResult = await client.query(
+      `
+        SELECT id
+        FROM wood_log_photos
+        WHERE log_id = $1
+        ORDER BY captured_at DESC, created_at DESC
+      `,
+      [logId]
+    );
+    const photoCount = remainingResult.rowCount ?? 0;
+    const status = photoCount > 0 ? "received" : "pending";
+
+    await client.query(
+      `
+        UPDATE wood_logs
+        SET
+          status = $2,
+          received_at = CASE
+            WHEN $2 = 'pending' THEN NULL
+            ELSE COALESCE(received_at, now())
+          END,
+          updated_at = now()
+        WHERE id = $1
+      `,
+      [logId, status]
+    );
+    await client.query("COMMIT");
+
+    response.json({
+      message: "Đã xóa ảnh cây gỗ.",
+      deletedPhotoId: request.params.id,
+      photoCount,
+      latestPhotoId: (remainingResult.rows[0]?.id as string | undefined) ?? null,
+      status
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+});
 
 app.get("/api/photos/:id", async (request, response) => {
   const result = await pool.query(
@@ -592,7 +770,7 @@ app.get("/api/photos/:id", async (request, response) => {
 
   response.setHeader("Content-Type", photo.mime_type);
   response.setHeader("Content-Length", String(photo.byte_size));
-  response.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+  response.setHeader("Cache-Control", "private, no-store");
   response.send(photo.photo_data);
 });
 

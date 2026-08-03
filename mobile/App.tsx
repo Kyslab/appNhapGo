@@ -65,7 +65,10 @@ export default function App() {
             <ImportScreen onImported={markDataChanged} />
           ) : null}
           {activeTab === "lists" ? (
-            <ListsScreen refreshKey={dataVersion} />
+            <ListsScreen
+              onDataChanged={markDataChanged}
+              refreshKey={dataVersion}
+            />
           ) : null}
           {activeTab === "warehouse" ? (
             <WarehouseScreen refreshKey={dataVersion} />
