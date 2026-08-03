@@ -16,12 +16,14 @@ CREATE TABLE IF NOT EXISTS wood_imports (
   owner_name text,
   contact_phone text,
   lot_name text,
+  vessel_name text,
   wood_species text,
   container_20_count integer NOT NULL DEFAULT 0
     CHECK (container_20_count >= 0),
   container_40_count integer NOT NULL DEFAULT 0
     CHECK (container_40_count >= 0),
   container_pickup_location text,
+  wood_pickup_location text,
   intake_start_date date,
   total_quantity integer CHECK (total_quantity > 0),
   quantity_unit text CHECK (quantity_unit IN ('logs', 'packages', 'boxes')),
@@ -34,12 +36,14 @@ ALTER TABLE wood_imports
   ADD COLUMN IF NOT EXISTS owner_name text,
   ADD COLUMN IF NOT EXISTS contact_phone text,
   ADD COLUMN IF NOT EXISTS lot_name text,
+  ADD COLUMN IF NOT EXISTS vessel_name text,
   ADD COLUMN IF NOT EXISTS wood_species text,
   ADD COLUMN IF NOT EXISTS container_20_count integer NOT NULL DEFAULT 0
     CHECK (container_20_count >= 0),
   ADD COLUMN IF NOT EXISTS container_40_count integer NOT NULL DEFAULT 0
     CHECK (container_40_count >= 0),
   ADD COLUMN IF NOT EXISTS container_pickup_location text,
+  ADD COLUMN IF NOT EXISTS wood_pickup_location text,
   ADD COLUMN IF NOT EXISTS intake_start_date date,
   ADD COLUMN IF NOT EXISTS total_quantity integer CHECK (total_quantity > 0),
   ADD COLUMN IF NOT EXISTS quantity_unit text

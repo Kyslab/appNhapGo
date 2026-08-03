@@ -7,10 +7,12 @@ export type ImportDetailsInput = {
   ownerName: string;
   contactPhone: string;
   lotName: string;
+  vesselName: string;
   woodSpecies: string;
   container20Count: string;
   container40Count: string;
   containerPickupLocation: string;
+  woodPickupLocation: string;
   intakeStartDate: string;
   totalQuantity: string;
   quantityUnit: QuantityUnit;
@@ -48,10 +50,12 @@ export type WoodImport = {
   ownerName: string | null;
   contactPhone: string | null;
   lotName: string | null;
+  vesselName: string | null;
   woodSpecies: string | null;
   container20Count: number;
   container40Count: number;
   containerPickupLocation: string | null;
+  woodPickupLocation: string | null;
   intakeStartDate: string | null;
   totalQuantity: number | null;
   quantityUnit: QuantityUnit | null;

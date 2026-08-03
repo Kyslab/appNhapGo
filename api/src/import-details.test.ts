@@ -6,12 +6,42 @@ import {
 } from "./import-details.js";
 
 describe("parseImportDetails", () => {
-  it("accepts a loose shipment without container fields", () => {
-    const details = parseImportDetails({ shipmentType: "loose" });
+  it("normalizes valid loose shipment details", () => {
+    const details = parseImportDetails({
+      shipmentType: "loose",
+      ownerName: " Chủ hàng B ",
+      contactPhone: "0907654321",
+      vesselName: "Tàu Đại Dương",
+      woodSpecies: "Padouk",
+      woodPickupLocation: "Cảng Quy Nhơn",
+      intakeStartDate: "2026-08-03",
+      totalQuantity: "120",
+      quantityUnit: "logs"
+    });
 
     assert.equal(details.shipmentType, "loose");
-    assert.equal(details.ownerName, null);
+    assert.equal(details.ownerName, "Chủ hàng B");
+    assert.equal(details.vesselName, "Tàu Đại Dương");
+    assert.equal(details.woodPickupLocation, "Cảng Quy Nhơn");
     assert.equal(details.container20Count, 0);
+    assert.equal(details.totalQuantity, 120);
+  });
+
+  it("rejects a loose shipment without a vessel name", () => {
+    assert.throws(
+      () =>
+        parseImportDetails({
+          shipmentType: "loose",
+          ownerName: "Chủ hàng B",
+          contactPhone: "0907654321",
+          woodSpecies: "Padouk",
+          woodPickupLocation: "Cảng Quy Nhơn",
+          intakeStartDate: "2026-08-03",
+          totalQuantity: "120",
+          quantityUnit: "logs"
+        }),
+      ImportDetailsError
+    );
   });
 
   it("normalizes valid container details", () => {

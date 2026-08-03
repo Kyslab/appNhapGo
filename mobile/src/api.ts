@@ -78,18 +78,21 @@ export async function importWorkbook(
 ) {
   const form = new FormData();
   form.append("shipmentType", details.shipmentType);
+  form.append("ownerName", details.ownerName);
+  form.append("contactPhone", details.contactPhone);
+  form.append("woodSpecies", details.woodSpecies);
+  form.append("intakeStartDate", details.intakeStartDate);
+  form.append("totalQuantity", details.totalQuantity);
+  form.append("quantityUnit", details.quantityUnit);
 
   if (details.shipmentType === "container") {
-    form.append("ownerName", details.ownerName);
-    form.append("contactPhone", details.contactPhone);
     form.append("lotName", details.lotName);
-    form.append("woodSpecies", details.woodSpecies);
     form.append("container20Count", details.container20Count);
     form.append("container40Count", details.container40Count);
     form.append("containerPickupLocation", details.containerPickupLocation);
-    form.append("intakeStartDate", details.intakeStartDate);
-    form.append("totalQuantity", details.totalQuantity);
-    form.append("quantityUnit", details.quantityUnit);
+  } else {
+    form.append("vesselName", details.vesselName);
+    form.append("woodPickupLocation", details.woodPickupLocation);
   }
 
   form.append(

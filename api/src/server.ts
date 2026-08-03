@@ -148,10 +148,12 @@ function mapImport(row: DatabaseRow) {
     ownerName: row.owner_name,
     contactPhone: row.contact_phone,
     lotName: row.lot_name,
+    vesselName: row.vessel_name,
     woodSpecies: row.wood_species,
     container20Count: asNumber(row.container_20_count) ?? 0,
     container40Count: asNumber(row.container_40_count) ?? 0,
     containerPickupLocation: row.container_pickup_location,
+    woodPickupLocation: row.wood_pickup_location,
     intakeStartDate: row.intake_start_date,
     totalQuantity: asNumber(row.total_quantity),
     quantityUnit: row.quantity_unit,
@@ -309,17 +311,19 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
           owner_name,
           contact_phone,
           lot_name,
+          vessel_name,
           wood_species,
           container_20_count,
           container_40_count,
           container_pickup_location,
+          wood_pickup_location,
           intake_start_date,
           total_quantity,
           quantity_unit
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
         )
         RETURNING id
       `,
@@ -337,10 +341,12 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
         details.ownerName,
         details.contactPhone,
         details.lotName,
+        details.vesselName,
         details.woodSpecies,
         details.container20Count,
         details.container40Count,
         details.containerPickupLocation,
+        details.woodPickupLocation,
         details.intakeStartDate,
         details.totalQuantity,
         details.quantityUnit

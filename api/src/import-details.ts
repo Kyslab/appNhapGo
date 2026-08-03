@@ -6,10 +6,12 @@ export type ImportDetails = {
   ownerName: string | null;
   contactPhone: string | null;
   lotName: string | null;
+  vesselName: string | null;
   woodSpecies: string | null;
   container20Count: number;
   container40Count: number;
   containerPickupLocation: string | null;
+  woodPickupLocation: string | null;
   intakeStartDate: string | null;
   totalQuantity: number | null;
   quantityUnit: QuantityUnit | null;
@@ -110,19 +112,45 @@ export function parseImportDetails(value: unknown): ImportDetails {
     );
   }
 
+  const ownerName = requiredText(body, "ownerName", "tên chủ hàng");
+  const contactPhone = requiredText(
+    body,
+    "contactPhone",
+    "điện thoại liên hệ",
+    30
+  );
+  const woodSpecies = requiredText(body, "woodSpecies", "loại gỗ");
+  const intakeStartDate = validDate(body, "intakeStartDate");
+  const totalQuantity = positiveInteger(
+    body,
+    "totalQuantity",
+    "Tổng số lượng"
+  );
+  const quantityUnit = String(body.quantityUnit ?? "").trim();
+
+  if (!new Set(["logs", "packages", "boxes"]).has(quantityUnit)) {
+    throw new ImportDetailsError("Vui lòng chọn đơn vị lóng, kiện hoặc hộp.");
+  }
+
   if (shipmentType === "loose") {
     return {
       shipmentType,
-      ownerName: null,
-      contactPhone: null,
+      ownerName,
+      contactPhone,
       lotName: null,
-      woodSpecies: null,
+      vesselName: requiredText(body, "vesselName", "tên tàu"),
+      woodSpecies,
       container20Count: 0,
       container40Count: 0,
       containerPickupLocation: null,
-      intakeStartDate: null,
-      totalQuantity: null,
-      quantityUnit: null
+      woodPickupLocation: requiredText(
+        body,
+        "woodPickupLocation",
+        "nơi lấy gỗ"
+      ),
+      intakeStartDate,
+      totalQuantity,
+      quantityUnit: quantityUnit as QuantityUnit
     };
   }
 
@@ -141,18 +169,13 @@ export function parseImportDetails(value: unknown): ImportDetails {
     throw new ImportDetailsError("Lô hàng phải có ít nhất 1 container.");
   }
 
-  const quantityUnit = String(body.quantityUnit ?? "").trim();
-
-  if (!new Set(["logs", "packages", "boxes"]).has(quantityUnit)) {
-    throw new ImportDetailsError("Vui lòng chọn đơn vị lóng, kiện hoặc hộp.");
-  }
-
   return {
     shipmentType,
-    ownerName: requiredText(body, "ownerName", "tên chủ hàng"),
-    contactPhone: requiredText(body, "contactPhone", "điện thoại liên hệ", 30),
+    ownerName,
+    contactPhone,
     lotName: requiredText(body, "lotName", "tên lô hàng"),
-    woodSpecies: requiredText(body, "woodSpecies", "loại gỗ"),
+    vesselName: null,
+    woodSpecies,
     container20Count,
     container40Count,
     containerPickupLocation: requiredText(
@@ -160,8 +183,9 @@ export function parseImportDetails(value: unknown): ImportDetails {
       "containerPickupLocation",
       "nơi lấy container"
     ),
-    intakeStartDate: validDate(body, "intakeStartDate"),
-    totalQuantity: positiveInteger(body, "totalQuantity", "Tổng số lượng"),
+    woodPickupLocation: null,
+    intakeStartDate,
+    totalQuantity,
     quantityUnit: quantityUnit as QuantityUnit
   };
 }

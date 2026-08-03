@@ -51,10 +51,12 @@ function emptyDetails(): ImportDetailsInput {
     ownerName: "",
     contactPhone: "",
     lotName: "",
+    vesselName: "",
     woodSpecies: "",
     container20Count: "0",
     container40Count: "0",
     containerPickupLocation: "",
+    woodPickupLocation: "",
     intakeStartDate: localDate(),
     totalQuantity: "",
     quantityUnit: "logs"
@@ -233,7 +235,9 @@ export function ImportScreen({ onImported }: { onImported: () => void }) {
                   details={details}
                   onChange={updateDetail}
                 />
-              ) : null}
+              ) : (
+                <LooseForm details={details} onChange={updateDetail} />
+              )}
 
               {asset ? (
                 <View style={styles.actionRow}>
@@ -339,22 +343,7 @@ function ContainerForm({
 }) {
   return (
     <>
-      <FormSection title="Chủ hàng">
-        <FormField
-          autoCapitalize="words"
-          label="Tên chủ hàng"
-          onChangeText={(value) => onChange("ownerName", value)}
-          placeholder="Tên cá nhân hoặc công ty"
-          value={details.ownerName}
-        />
-        <FormField
-          keyboardType="phone-pad"
-          label="Điện thoại liên hệ"
-          onChangeText={(value) => onChange("contactPhone", value)}
-          placeholder="0901234567"
-          value={details.contactPhone}
-        />
-      </FormSection>
+      <OwnerSection details={details} onChange={onChange} />
 
       <FormSection title="Thông tin lô hàng">
         <FormField
@@ -397,29 +386,111 @@ function ContainerForm({
         />
       </FormSection>
 
-      <FormSection title="Tổng hợp lô hàng">
+      <ShipmentSummarySection details={details} onChange={onChange} />
+    </>
+  );
+}
+
+type DetailChange = <Key extends keyof ImportDetailsInput>(
+  key: Key,
+  value: ImportDetailsInput[Key]
+) => void;
+
+function LooseForm({
+  details,
+  onChange
+}: {
+  details: ImportDetailsInput;
+  onChange: DetailChange;
+}) {
+  return (
+    <>
+      <OwnerSection details={details} onChange={onChange} />
+
+      <FormSection title="Thông tin lô hàng">
         <FormField
-          autoCapitalize="none"
-          label="Ngày bắt đầu nhập"
-          maxLength={10}
-          onChangeText={(value) => onChange("intakeStartDate", value)}
-          placeholder="YYYY-MM-DD"
-          value={details.intakeStartDate}
+          autoCapitalize="words"
+          label="Tên tàu"
+          onChangeText={(value) => onChange("vesselName", value)}
+          placeholder="Tên tàu vận chuyển"
+          value={details.vesselName}
         />
         <FormField
-          keyboardType="number-pad"
-          label="Tổng số lượng lô hàng"
-          onChangeText={(value) => onChange("totalQuantity", value)}
-          placeholder="83"
-          value={details.totalQuantity}
+          label="Gỗ"
+          onChangeText={(value) => onChange("woodSpecies", value)}
+          placeholder="Padouk"
+          value={details.woodSpecies}
         />
-        <Text style={styles.fieldLabel}>Đơn vị</Text>
-        <QuantityUnitSelector
-          onChange={(value) => onChange("quantityUnit", value)}
-          value={details.quantityUnit}
+        <FormField
+          label="Nơi lấy gỗ"
+          onChangeText={(value) => onChange("woodPickupLocation", value)}
+          placeholder="Tên cảng hoặc địa điểm"
+          value={details.woodPickupLocation}
         />
       </FormSection>
+
+      <ShipmentSummarySection details={details} onChange={onChange} />
     </>
+  );
+}
+
+function OwnerSection({
+  details,
+  onChange
+}: {
+  details: ImportDetailsInput;
+  onChange: DetailChange;
+}) {
+  return (
+    <FormSection title="Chủ hàng">
+      <FormField
+        autoCapitalize="words"
+        label="Tên chủ hàng"
+        onChangeText={(value) => onChange("ownerName", value)}
+        placeholder="Tên cá nhân hoặc công ty"
+        value={details.ownerName}
+      />
+      <FormField
+        keyboardType="phone-pad"
+        label="Điện thoại liên hệ"
+        onChangeText={(value) => onChange("contactPhone", value)}
+        placeholder="0901234567"
+        value={details.contactPhone}
+      />
+    </FormSection>
+  );
+}
+
+function ShipmentSummarySection({
+  details,
+  onChange
+}: {
+  details: ImportDetailsInput;
+  onChange: DetailChange;
+}) {
+  return (
+    <FormSection title="Tổng hợp lô hàng">
+      <FormField
+        autoCapitalize="none"
+        label="Ngày bắt đầu nhập"
+        maxLength={10}
+        onChangeText={(value) => onChange("intakeStartDate", value)}
+        placeholder="YYYY-MM-DD"
+        value={details.intakeStartDate}
+      />
+      <FormField
+        keyboardType="number-pad"
+        label="Tổng số lượng lô hàng"
+        onChangeText={(value) => onChange("totalQuantity", value)}
+        placeholder="83"
+        value={details.totalQuantity}
+      />
+      <Text style={styles.fieldLabel}>Đơn vị</Text>
+      <QuantityUnitSelector
+        onChange={(value) => onChange("quantityUnit", value)}
+        value={details.quantityUnit}
+      />
+    </FormSection>
   );
 }
 
@@ -500,16 +571,17 @@ function QuantityUnitSelector({
 function ImportSummary({ item }: { item: WoodImport }) {
   const progress =
     item.totalLogs === 0 ? 0 : item.receivedLogs / item.totalLogs;
+  const displayName = importDisplayName(item);
 
   return (
     <View style={styles.importCard}>
       <View style={styles.importTop}>
         <View style={styles.importIdentity}>
           <Text style={styles.importCode} numberOfLines={1}>
-            {item.lotName || item.listCode}
+            {displayName}
           </Text>
           <Text style={styles.importFile} numberOfLines={1}>
-            {item.lotName ? item.listCode + " · " : ""}
+            {displayName !== item.listCode ? item.listCode + " · " : ""}
             {item.originalFilename}
           </Text>
         </View>
@@ -526,16 +598,20 @@ function ImportSummary({ item }: { item: WoodImport }) {
           </Text>
         </View>
       </View>
-      {item.shipmentType === "container" ? (
-        <Text style={styles.shipmentMeta} numberOfLines={2}>
-          {(item.ownerName || "--") +
+      <Text style={styles.shipmentMeta} numberOfLines={2}>
+        {item.shipmentType === "container"
+          ? (item.ownerName || "--") +
             " · " +
             item.container20Count +
             " Cont 20' · " +
             item.container40Count +
-            " Cont 40'"}
-        </Text>
-      ) : null}
+            " Cont 40'"
+          : (item.ownerName || "--") +
+            " · Tàu " +
+            (item.vesselName || "--") +
+            " · " +
+            (item.woodSpecies || "--")}
+      </Text>
       <View style={styles.progressTrack}>
         <View
           style={[
@@ -568,37 +644,50 @@ function ImportSummary({ item }: { item: WoodImport }) {
 }
 
 function validateDetails(details: ImportDetailsInput): string | null {
-  if (details.shipmentType === "loose") {
-    return null;
-  }
-
   const required: [string, string][] = [
     [details.ownerName, "tên chủ hàng"],
     [details.contactPhone, "điện thoại liên hệ"],
-    [details.lotName, "tên lô hàng"],
     [details.woodSpecies, "loại gỗ"],
-    [details.containerPickupLocation, "nơi lấy container"],
     [details.intakeStartDate, "ngày bắt đầu nhập"],
     [details.totalQuantity, "tổng số lượng lô hàng"]
   ];
+
+  if (details.shipmentType === "container") {
+    required.splice(
+      2,
+      0,
+      [details.lotName, "tên lô hàng"],
+      [details.containerPickupLocation, "nơi lấy container"]
+    );
+  } else {
+    required.splice(
+      2,
+      0,
+      [details.vesselName, "tên tàu"],
+      [details.woodPickupLocation, "nơi lấy gỗ"]
+    );
+  }
+
   const missing = required.find(([value]) => !value.trim());
 
   if (missing) {
     return "Vui lòng nhập " + missing[1] + ".";
   }
 
-  if (
-    !/^\d+$/.test(details.container20Count) ||
-    !/^\d+$/.test(details.container40Count)
-  ) {
-    return "Số container phải là số nguyên từ 0 trở lên.";
-  }
+  if (details.shipmentType === "container") {
+    if (
+      !/^\d+$/.test(details.container20Count) ||
+      !/^\d+$/.test(details.container40Count)
+    ) {
+      return "Số container phải là số nguyên từ 0 trở lên.";
+    }
 
-  if (
-    Number(details.container20Count) + Number(details.container40Count) ===
-    0
-  ) {
-    return "Lô hàng phải có ít nhất 1 container.";
+    if (
+      Number(details.container20Count) + Number(details.container40Count) ===
+      0
+    ) {
+      return "Lô hàng phải có ít nhất 1 container.";
+    }
   }
 
   if (!/^\d+$/.test(details.totalQuantity) || Number(details.totalQuantity) <= 0) {
@@ -610,6 +699,12 @@ function validateDetails(details: ImportDetailsInput): string | null {
   }
 
   return null;
+}
+
+function importDisplayName(item: WoodImport): string {
+  return item.shipmentType === "container"
+    ? item.lotName || item.listCode
+    : item.vesselName || item.listCode;
 }
 
 export function quantityUnitLabel(value: QuantityUnit): string {

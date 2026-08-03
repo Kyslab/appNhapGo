@@ -91,6 +91,8 @@ export function ListsScreen({ refreshKey }: { refreshKey: number }) {
   }
 
   if (selectedImport) {
+    const displayName = importDisplayName(selectedImport);
+
     return (
       <FlatList
         data={logs}
@@ -112,10 +114,12 @@ export function ListsScreen({ refreshKey }: { refreshKey: number }) {
               />
               <View style={styles.detailIdentity}>
                 <Text style={styles.detailCode} numberOfLines={1}>
-                  {selectedImport.lotName || selectedImport.listCode}
+                  {displayName}
                 </Text>
                 <Text style={styles.detailFile} numberOfLines={1}>
-                  {selectedImport.lotName ? selectedImport.listCode + " · " : ""}
+                  {displayName !== selectedImport.listCode
+                    ? selectedImport.listCode + " · "
+                    : ""}
                   {selectedImport.originalFilename}
                 </Text>
               </View>
@@ -191,6 +195,7 @@ function ImportRow({
     item.totalLogs === 0 ? 0 : item.receivedLogs / item.totalLogs;
   const ShipmentIcon =
     item.shipmentType === "container" ? Container : PackageOpen;
+  const displayName = importDisplayName(item);
 
   return (
     <Pressable
@@ -206,7 +211,7 @@ function ImportRow({
       </View>
       <View style={styles.importBody}>
         <Text style={styles.importCode} numberOfLines={1}>
-          {item.lotName || item.listCode}
+          {displayName}
         </Text>
         <Text style={styles.importMeta}>
           {item.shipmentType === "container"
@@ -216,7 +221,7 @@ function ImportRow({
               "C20 · " +
               item.container40Count +
               "C40"
-            : item.listCode + " · Hàng rời"}
+            : item.listCode + " · Tàu " + (item.vesselName || "--")}
         </Text>
         <Text style={styles.importMeta}>
           {item.receivedLogs + "/" + item.totalLogs + " cây đã nhận"}
@@ -239,7 +244,29 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
   if (item.shipmentType !== "container") {
     return (
       <View style={styles.shipmentBand}>
-        <ShipmentRow label="Hình thức nhập" value="Hàng rời" />
+        <Text style={styles.shipmentHeading}>Thông tin lô hàng</Text>
+        <ShipmentRow
+          label="Chủ hàng"
+          value={(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
+        />
+        <ShipmentRow label="Tên tàu" value={item.vesselName || "--"} />
+        <ShipmentRow label="Gỗ" value={item.woodSpecies || "--"} />
+        <ShipmentRow
+          label="Nơi lấy gỗ"
+          value={item.woodPickupLocation || "--"}
+        />
+        <ShipmentRow
+          label="Ngày bắt đầu"
+          value={formatImportDate(item.intakeStartDate)}
+        />
+        <ShipmentRow
+          label="Tổng lô"
+          value={
+            item.totalQuantity && item.quantityUnit
+              ? item.totalQuantity + " " + quantityUnitLabel(item.quantityUnit)
+              : "--"
+          }
+        />
       </View>
     );
   }
@@ -279,6 +306,12 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
       />
     </View>
   );
+}
+
+function importDisplayName(item: WoodImport): string {
+  return item.shipmentType === "container"
+    ? item.lotName || item.listCode
+    : item.vesselName || item.listCode;
 }
 
 function ShipmentRow({ label, value }: { label: string; value: string }) {
