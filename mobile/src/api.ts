@@ -1,7 +1,13 @@
 import { Platform } from "react-native";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { File, UploadType } from "expo-file-system";
-import type { PhotoFile, WoodImport, WoodLog } from "./types";
+import type {
+  PhotoFile,
+  WarehouseOverview,
+  WoodImport,
+  WoodLog,
+  WoodLogPhoto
+} from "./types";
 
 const emulatorUrl = Platform.OS === "android"
   ? "http://10.0.2.2:4000"
@@ -101,6 +107,17 @@ export async function getImportLogs(
     "/api/imports/" + encodeURIComponent(importId) + "/logs" + query
   );
   return result.logs;
+}
+
+export async function getWarehouse(): Promise<WarehouseOverview> {
+  return request<WarehouseOverview>("/api/warehouse");
+}
+
+export async function getLogPhotos(logId: string): Promise<WoodLogPhoto[]> {
+  const result = await request<{ photos: WoodLogPhoto[] }>(
+    "/api/logs/" + encodeURIComponent(logId) + "/photos"
+  );
+  return result.photos;
 }
 
 export async function uploadLogPhoto(logId: string, photo: PhotoFile) {

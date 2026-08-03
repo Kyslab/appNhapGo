@@ -114,6 +114,18 @@ function mapLog(row: DatabaseRow) {
   };
 }
 
+function mapPhoto(row: DatabaseRow) {
+  return {
+    id: row.id,
+    logId: row.log_id,
+    mimeType: row.mime_type,
+    originalFilename: row.original_filename,
+    byteSize: asNumber(row.byte_size) ?? 0,
+    capturedAt: row.captured_at,
+    createdAt: row.created_at
+  };
+}
+
 function mapImport(row: DatabaseRow) {
   const totalLogs = asNumber(row.total_logs ?? row.imported_rows) ?? 0;
   const receivedLogs = asNumber(row.received_logs) ?? 0;
@@ -195,6 +207,44 @@ app.get("/api/imports", async (_request, response) => {
   );
 
   response.json({ imports: result.rows.map((row) => mapImport(row as DatabaseRow)) });
+});
+
+app.get("/api/warehouse", async (_request, response) => {
+  const [summaryResult, logsResult] = await Promise.all([
+    pool.query(`
+      SELECT
+        (SELECT count(*)::int FROM wood_imports) AS total_imports,
+        (SELECT count(*)::int FROM wood_logs) AS total_logs,
+        (
+          SELECT count(*)::int
+          FROM wood_logs
+          WHERE status = 'received'
+        ) AS received_logs,
+        (SELECT count(*)::int FROM wood_log_photos) AS photo_count
+    `),
+    pool.query(
+      LOG_SELECT +
+        `
+          WHERE l.status = 'received'
+          ORDER BY l.received_at DESC NULLS LAST, l.updated_at DESC
+          LIMIT 300
+        `
+    )
+  ]);
+  const summary = summaryResult.rows[0] as DatabaseRow;
+  const totalLogs = asNumber(summary.total_logs) ?? 0;
+  const receivedLogs = asNumber(summary.received_logs) ?? 0;
+
+  response.json({
+    summary: {
+      totalImports: asNumber(summary.total_imports) ?? 0,
+      totalLogs,
+      receivedLogs,
+      pendingLogs: Math.max(totalLogs - receivedLogs, 0),
+      photoCount: asNumber(summary.photo_count) ?? 0
+    },
+    logs: logsResult.rows.map((row) => mapLog(row as DatabaseRow))
+  });
 });
 
 app.post("/api/imports", importUpload.single("file"), async (request, response) => {
@@ -350,6 +400,29 @@ app.get("/api/logs/search", async (request, response) => {
   );
 
   response.json({ logs: result.rows.map((row) => mapLog(row as DatabaseRow)) });
+});
+
+app.get("/api/logs/:id/photos", async (request, response) => {
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        log_id,
+        mime_type,
+        original_filename,
+        byte_size,
+        captured_at,
+        created_at
+      FROM wood_log_photos
+      WHERE log_id = $1
+      ORDER BY captured_at DESC, created_at DESC
+    `,
+    [request.params.id]
+  );
+
+  response.json({
+    photos: result.rows.map((row) => mapPhoto(row as DatabaseRow))
+  });
 });
 
 app.post(

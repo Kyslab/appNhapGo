@@ -40,3 +40,25 @@ export type PhotoFile = {
   mimeType: string;
 };
 
+export type WoodLogPhoto = {
+  id: string;
+  logId: string;
+  mimeType: string;
+  originalFilename: string;
+  byteSize: number;
+  capturedAt: string;
+  createdAt: string;
+};
+
+export type WarehouseSummary = {
+  totalImports: number;
+  totalLogs: number;
+  receivedLogs: number;
+  pendingLogs: number;
+  photoCount: number;
+};
+
+export type WarehouseOverview = {
+  summary: WarehouseSummary;
+  logs: WoodLog[];
+};

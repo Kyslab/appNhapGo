@@ -12,6 +12,7 @@ import {
   Layers3,
   ListTree,
   Search,
+  Warehouse,
   type LucideProps
 } from "lucide-react-native";
 import {
@@ -22,15 +23,17 @@ import {
 import { ImportScreen } from "./src/ImportScreen";
 import { ListsScreen } from "./src/ListsScreen";
 import { SearchScreen } from "./src/SearchScreen";
+import { WarehouseScreen } from "./src/WarehouseScreen";
 import { colors } from "./src/theme";
 
-type Tab = "search" | "import" | "lists";
+type Tab = "search" | "import" | "lists" | "warehouse";
 type IconType = ComponentType<LucideProps>;
 
 const tabs: { id: Tab; label: string; icon: IconType }[] = [
   { id: "search", label: "Tra Log", icon: Search },
   { id: "import", label: "Nhập Excel", icon: FileUp },
-  { id: "lists", label: "Danh sách", icon: ListTree }
+  { id: "lists", label: "Danh sách", icon: ListTree },
+  { id: "warehouse", label: "Nhập kho", icon: Warehouse }
 ];
 
 export default function App() {
@@ -63,6 +66,9 @@ export default function App() {
           ) : null}
           {activeTab === "lists" ? (
             <ListsScreen refreshKey={dataVersion} />
+          ) : null}
+          {activeTab === "warehouse" ? (
+            <WarehouseScreen refreshKey={dataVersion} />
           ) : null}
         </View>
 
