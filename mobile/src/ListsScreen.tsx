@@ -65,6 +65,7 @@ export function ListsScreen({
   const [filter, setFilter] = useState<Filter>("all");
   const [woodType, setWoodType] = useState("all");
   const [logQuery, setLogQuery] = useState("");
+  const [importQuery, setImportQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<WoodLog | null>(null);
@@ -118,6 +119,25 @@ export function ListsScreen({
       return matchesStatus && matchesWood && matchesQuery;
     });
   }, [filter, logQuery, logs, selectedImport?.woodSpecies, woodType]);
+
+  const visibleImports = useMemo(() => {
+    const query = normalizeSearch(importQuery);
+
+    if (!query) {
+      return imports;
+    }
+
+    return imports.filter((item) =>
+      [
+        item.originalFilename,
+        item.listCode,
+        item.lotName,
+        item.vesselName,
+        item.ownerName,
+        item.woodSpecies
+      ].some((value) => value && normalizeSearch(value).includes(query))
+    );
+  }, [importQuery, imports]);
 
   function errorMessage(caught: unknown): string {
     return caught instanceof ApiError || caught instanceof Error
@@ -512,24 +532,62 @@ export function ListsScreen({
 
   return (
     <FlatList
-      data={imports}
+      data={visibleImports}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.content}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
       refreshing={loading}
       onRefresh={loadImports}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={screenText.title}>Các danh sách gỗ</Text>
+          <View style={styles.logSearchRow}>
+            <Search color={colors.muted} size={19} />
+            <TextInput
+              accessibilityLabel="Tìm tên file hàng"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              onChangeText={setImportQuery}
+              placeholder="Tìm tên file, mã lô hoặc tên tàu"
+              placeholderTextColor={colors.disabled}
+              style={styles.logSearchInput}
+              value={importQuery}
+            />
+            {importQuery ? (
+              <IconButton
+                icon={X}
+                label="Xóa tên file đang tìm"
+                onPress={() => setImportQuery("")}
+              />
+            ) : null}
+          </View>
           {error ? (
             <Notice title="Không tải được dữ liệu" tone="error">
               {error}
             </Notice>
           ) : null}
+          <Text style={styles.resultText}>
+            {visibleImports.length + " / " + imports.length + " file"}
+          </Text>
         </View>
       }
       ListEmptyComponent={
-        !loading ? <EmptyState title="Chưa có danh sách nào" /> : null
+        !loading ? (
+          <EmptyState
+            message={
+              imports.length > 0
+                ? "Hãy thử một phần khác của tên file, mã lô hoặc tên tàu."
+                : undefined
+            }
+            title={
+              imports.length > 0
+                ? "Không tìm thấy file phù hợp"
+                : "Chưa có danh sách nào"
+            }
+          />
+        ) : null
       }
       renderItem={({ item }) => (
         <ImportRow item={item} onPress={() => openImport(item)} />
@@ -754,7 +812,12 @@ function formatMetric(value: number | null, suffix: string): string {
 }
 
 function normalizeSearch(value: string): string {
-  return value.toLocaleUpperCase("vi-VN").replace(/[\s._/-]+/g, "");
+  return value
+    .toLocaleUpperCase("vi-VN")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/Đ/g, "D")
+    .replace(/[\s._/-]+/g, "");
 }
 
 function formatImportDate(value: string | null): string {
