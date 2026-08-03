@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
-  Image,
   Keyboard,
   Modal,
   Pressable,
@@ -21,9 +20,7 @@ import {
   X
 } from "lucide-react-native";
 import {
-  apiHeaders,
   ApiError,
-  photoUrl,
   searchLogs,
   uploadLogPhoto
 } from "./api";
@@ -37,6 +34,7 @@ import {
   StatusBadge
 } from "./components";
 import { colors } from "./theme";
+import { PhotoImage, storeCapturedPhoto } from "./PhotoImage";
 import type { WoodLog } from "./types";
 
 const PENDING_CAMERA_LOG = "appNhapGo.pendingCameraLogId";
@@ -150,6 +148,12 @@ export function SearchScreen({
       name: "log-" + logId + "-" + Date.now() + ".jpg",
       mimeType: "image/jpeg"
     });
+
+    try {
+      await storeCapturedPhoto(response.photoId, compressed.uri);
+    } catch (caught) {
+      console.warn("Captured photo could not be copied to app storage", caught);
+    }
 
     setResults((current) =>
       current.map((log) =>
@@ -337,13 +341,10 @@ export function SearchScreen({
               </View>
 
               {selectedLog.latestPhotoId ? (
-                <Image
+                <PhotoImage
                   accessibilityLabel={"Ảnh cây " + selectedLog.logNo}
+                  photoId={selectedLog.latestPhotoId}
                   resizeMode="cover"
-                  source={{
-                    uri: photoUrl(selectedLog.latestPhotoId),
-                    headers: apiHeaders()
-                  }}
                   style={styles.latestPhoto}
                 />
               ) : (
@@ -525,4 +526,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0
   }
 });
-

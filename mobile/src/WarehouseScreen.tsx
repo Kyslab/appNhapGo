@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -18,11 +17,9 @@ import {
   X
 } from "lucide-react-native";
 import {
-  apiHeaders,
   ApiError,
   getLogPhotos,
-  getWarehouse,
-  photoUrl
+  getWarehouse
 } from "./api";
 import {
   EmptyState,
@@ -31,6 +28,7 @@ import {
   screenText
 } from "./components";
 import { colors, shadows } from "./theme";
+import { PhotoImage } from "./PhotoImage";
 import type {
   WarehouseOverview,
   WoodLog,
@@ -182,13 +180,10 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
                 showsVerticalScrollIndicator={false}
               >
                 {currentPhotoId ? (
-                  <Image
+                  <PhotoImage
                     accessibilityLabel={"Ảnh cây " + selectedLog.logNo}
+                    photoId={currentPhotoId}
                     resizeMode="contain"
-                    source={{
-                      uri: photoUrl(currentPhotoId),
-                      headers: apiHeaders()
-                    }}
                     style={styles.mainPhoto}
                   />
                 ) : (
@@ -243,11 +238,9 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
                               active && styles.thumbnailButtonActive
                             ]}
                           >
-                            <Image
-                              source={{
-                                uri: photoUrl(photo.id),
-                                headers: apiHeaders()
-                              }}
+                            <PhotoImage
+                              accessibilityLabel={"Ảnh " + (index + 1)}
+                              photoId={photo.id}
                               style={styles.thumbnail}
                             />
                           </Pressable>
@@ -288,13 +281,10 @@ function WarehouseRow({
       ]}
     >
       {log.latestPhotoId ? (
-        <Image
+        <PhotoImage
           accessibilityLabel={"Ảnh cây " + log.logNo}
+          photoId={log.latestPhotoId}
           resizeMode="cover"
-          source={{
-            uri: photoUrl(log.latestPhotoId),
-            headers: apiHeaders()
-          }}
           style={styles.rowPhoto}
         />
       ) : (
