@@ -212,3 +212,7 @@ export function parseImportDetails(value: unknown): ImportDetails {
     declaredVolumeCbm
   };
 }
+
+export function parseImportFilename(value: unknown): string {
+  return requiredText(bodyRecord(value), "originalFilename", "tên file", 255);
+}

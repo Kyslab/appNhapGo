@@ -13,11 +13,13 @@ import {
   Camera,
   CheckCircle2,
   ChevronRight,
+  FileSpreadsheet,
   Images,
   X
 } from "lucide-react-native";
 import {
   ApiError,
+  getImports,
   getLogPhotos,
   getWarehouse
 } from "./api";
@@ -31,12 +33,15 @@ import { colors, shadows } from "./theme";
 import { PhotoImage } from "./PhotoImage";
 import type {
   WarehouseOverview,
+  WoodImport,
   WoodLog,
   WoodLogPhoto
 } from "./types";
 
 export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
   const [overview, setOverview] = useState<WarehouseOverview | null>(null);
+  const [imports, setImports] = useState<WoodImport[]>([]);
+  const [selectedImportId, setSelectedImportId] = useState("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLog, setSelectedLog] = useState<WoodLog | null>(null);
@@ -54,7 +59,17 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
     setError(null);
 
     try {
-      setOverview(await getWarehouse());
+      const [nextOverview, nextImports] = await Promise.all([
+        getWarehouse(),
+        getImports()
+      ]);
+      setOverview(nextOverview);
+      setImports(nextImports);
+      setSelectedImportId((current) =>
+        current === "all" || nextImports.some((item) => item.id === current)
+          ? current
+          : "all"
+      );
     } catch (caught) {
       setError(errorMessage(caught, "Không thể tải dữ liệu nhập kho."));
     } finally {
@@ -93,25 +108,68 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
   );
   const summary = overview?.summary;
   const logs = overview?.logs ?? [];
+  const visibleLogs = useMemo(
+    () =>
+      selectedImportId === "all"
+        ? logs
+        : logs.filter((log) => log.importId === selectedImportId),
+    [logs, selectedImportId]
+  );
+  const selectedImport = imports.find((item) => item.id === selectedImportId);
 
   return (
     <>
       <FlatList
         contentContainerStyle={styles.content}
-        data={logs}
+        data={visibleLogs}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           !loading ? (
             <EmptyState
-              message="Ảnh chụp khi xác nhận cây về kho sẽ xuất hiện tại đây."
-              title="Chưa có cây nào nhập kho"
+              message={
+                selectedImport
+                  ? "File này chưa có cây nào được chụp ảnh và xác nhận nhập kho."
+                  : "Ảnh chụp khi xác nhận cây về kho sẽ xuất hiện tại đây."
+              }
+              title={
+                selectedImport
+                  ? "File chưa có cây đã nhập"
+                  : "Chưa có cây nào nhập kho"
+              }
             />
           ) : null
         }
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={screenText.title}>Nhập kho</Text>
+            <View style={styles.importPickerHeader}>
+              <Text style={screenText.sectionTitle}>Chọn file hàng</Text>
+              <Text style={styles.importPickerCount}>{imports.length + " file"}</Text>
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.importPickerRow}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              <ImportFilterCard
+                active={selectedImportId === "all"}
+                label="Tất cả file"
+                onPress={() => setSelectedImportId("all")}
+                pending={summary?.pendingLogs ?? 0}
+                received={summary?.receivedLogs ?? 0}
+              />
+              {imports.map((item) => (
+                <ImportFilterCard
+                  active={selectedImportId === item.id}
+                  key={item.id}
+                  label={importDisplayName(item)}
+                  onPress={() => setSelectedImportId(item.id)}
+                  pending={item.pendingLogs}
+                  received={item.receivedLogs}
+                />
+              ))}
+            </ScrollView>
             <View style={styles.summaryBand}>
               <SummaryMetric
                 label="Cây đã nhập"
@@ -132,8 +190,14 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
               </Notice>
             ) : null}
             <Text style={styles.resultText}>
-              {(summary?.receivedLogs ?? 0) + " cây trong " +
-                (summary?.totalImports ?? 0) + " danh sách"}
+              {selectedImport
+                ? selectedImport.receivedLogs +
+                  " cây đã nhập trong " +
+                  importDisplayName(selectedImport)
+                : (summary?.receivedLogs ?? 0) +
+                  " cây trong " +
+                  (summary?.totalImports ?? 0) +
+                  " danh sách"}
             </Text>
           </View>
         }
@@ -264,6 +328,66 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+function ImportFilterCard({
+  label,
+  received,
+  pending,
+  active,
+  onPress
+}: {
+  label: string;
+  received: number;
+  pending: number;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.importFilterCard,
+        active && styles.importFilterCardActive,
+        { opacity: pressed ? 0.8 : 1 }
+      ]}
+    >
+      <View style={styles.importFilterTitleRow}>
+        <FileSpreadsheet
+          color={active ? colors.primary : colors.muted}
+          size={18}
+        />
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.importFilterTitle,
+            active && styles.importFilterTitleActive
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+      <View style={styles.importFilterStats}>
+        <View style={styles.importFilterStat}>
+          <Text style={styles.importFilterValue}>{received}</Text>
+          <Text style={styles.importFilterLabel}>Đã nhập</Text>
+        </View>
+        <View style={styles.importFilterDivider} />
+        <View style={styles.importFilterStat}>
+          <Text style={styles.importFilterValue}>{pending}</Text>
+          <Text style={styles.importFilterLabel}>Còn lại</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function importDisplayName(item: WoodImport): string {
+  return item.shipmentType === "container"
+    ? item.lotName || item.listCode
+    : item.vesselName || item.listCode;
+}
+
 function WarehouseRow({
   log,
   onPress
@@ -358,6 +482,80 @@ const styles = StyleSheet.create({
   header: {
     gap: 12,
     marginBottom: 12
+  },
+  importPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  importPickerCount: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0
+  },
+  importPickerRow: {
+    gap: 9,
+    paddingRight: 12
+  },
+  importFilterCard: {
+    width: 198,
+    height: 108,
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 11,
+    backgroundColor: colors.surface
+  },
+  importFilterCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft
+  },
+  importFilterTitleRow: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7
+  },
+  importFilterTitle: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  importFilterTitleActive: {
+    color: colors.primary
+  },
+  importFilterStats: {
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  importFilterStat: {
+    flex: 1,
+    minWidth: 0
+  },
+  importFilterDivider: {
+    width: 1,
+    height: 28,
+    marginHorizontal: 8,
+    backgroundColor: colors.border
+  },
+  importFilterValue: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: 0
+  },
+  importFilterLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    letterSpacing: 0
   },
   separator: {
     height: 10

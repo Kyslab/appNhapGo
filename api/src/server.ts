@@ -15,7 +15,8 @@ import {
 } from "./importer.js";
 import {
   ImportDetailsError,
-  parseImportDetails
+  parseImportDetails,
+  parseImportFilename
 } from "./import-details.js";
 
 const app = express();
@@ -225,6 +226,84 @@ app.get("/api/imports", async (_request, response) => {
   );
 
   response.json({ imports: result.rows.map((row) => mapImport(row as DatabaseRow)) });
+});
+
+app.put("/api/imports/:id", async (request, response) => {
+  const details = parseImportDetails(request.body);
+  const originalFilename = parseImportFilename(request.body);
+  const result = await pool.query(
+    `
+      UPDATE wood_imports
+      SET
+        original_filename = $2,
+        shipment_type = $3,
+        owner_name = $4,
+        contact_phone = $5,
+        lot_name = $6,
+        vessel_name = $7,
+        wood_species = $8,
+        container_20_count = $9,
+        container_40_count = $10,
+        container_pickup_location = $11,
+        wood_pickup_location = $12,
+        intake_start_date = $13,
+        total_quantity = $14,
+        quantity_unit = $15,
+        declared_volume_cbm = $16
+      WHERE id = $1
+      RETURNING id
+    `,
+    [
+      request.params.id,
+      originalFilename,
+      details.shipmentType,
+      details.ownerName,
+      details.contactPhone,
+      details.lotName,
+      details.vesselName,
+      details.woodSpecies,
+      details.container20Count,
+      details.container40Count,
+      details.containerPickupLocation,
+      details.woodPickupLocation,
+      details.intakeStartDate,
+      details.totalQuantity,
+      details.quantityUnit,
+      details.declaredVolumeCbm
+    ]
+  );
+
+  if (!result.rows[0]) {
+    response.status(404).json({ message: "Không tìm thấy file cần sửa." });
+    return;
+  }
+
+  response.json({
+    message: "Đã cập nhật thông tin file.",
+    import: await getImportSummary(pool, request.params.id)
+  });
+});
+
+app.delete("/api/imports/:id", async (request, response) => {
+  const result = await pool.query(
+    `
+      DELETE FROM wood_imports
+      WHERE id = $1
+      RETURNING id, original_filename
+    `,
+    [request.params.id]
+  );
+
+  if (!result.rows[0]) {
+    response.status(404).json({ message: "Không tìm thấy file cần xóa." });
+    return;
+  }
+
+  response.json({
+    message: "Đã xóa file và toàn bộ dữ liệu liên quan.",
+    deletedImportId: result.rows[0].id,
+    originalFilename: result.rows[0].original_filename
+  });
 });
 
 app.get("/api/warehouse", async (_request, response) => {

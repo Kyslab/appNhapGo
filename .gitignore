@@ -6,10 +6,10 @@ node_modules/
 !.env.example
 dist/
 coverage/
+.android-check/
 *.log
 .DS_Store
 api/uploads/
 mobile/.expo/
 mobile/android/
 mobile/ios/
-

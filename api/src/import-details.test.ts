@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ImportDetailsError,
-  parseImportDetails
+  parseImportDetails,
+  parseImportFilename
 } from "./import-details.js";
 
 describe("parseImportDetails", () => {
@@ -117,6 +118,22 @@ describe("parseImportDetails", () => {
           totalQuantity: "1",
           quantityUnit: "logs"
         }),
+      ImportDetailsError
+    );
+  });
+});
+
+describe("parseImportFilename", () => {
+  it("trims a valid display filename", () => {
+    assert.equal(
+      parseImportFilename({ originalFilename: "  lo-hang.xlsx  " }),
+      "lo-hang.xlsx"
+    );
+  });
+
+  it("rejects an empty display filename", () => {
+    assert.throws(
+      () => parseImportFilename({ originalFilename: "   " }),
       ImportDetailsError
     );
   });

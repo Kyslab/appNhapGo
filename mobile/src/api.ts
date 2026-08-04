@@ -3,6 +3,7 @@ import type { DocumentPickerAsset } from "expo-document-picker";
 import { File, UploadType } from "expo-file-system";
 import type {
   ImportDetailsInput,
+  ImportUpdateInput,
   PhotoFile,
   WarehouseOverview,
   WoodImport,
@@ -70,6 +71,28 @@ function parseResponse<T>(text: string, ok: boolean): T {
 export async function getImports(): Promise<WoodImport[]> {
   const result = await request<{ imports: WoodImport[] }>("/api/imports");
   return result.imports;
+}
+
+export async function updateImport(
+  importId: string,
+  details: ImportUpdateInput
+) {
+  return request<{ message: string; import: WoodImport }>(
+    "/api/imports/" + encodeURIComponent(importId),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(details)
+    }
+  );
+}
+
+export async function deleteImport(importId: string) {
+  return request<{
+    message: string;
+    deletedImportId: string;
+    originalFilename: string;
+  }>("/api/imports/" + encodeURIComponent(importId), { method: "DELETE" });
 }
 
 export async function importWorkbook(

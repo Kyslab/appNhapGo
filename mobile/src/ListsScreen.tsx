@@ -17,16 +17,20 @@ import {
   ChevronRight,
   Container,
   PackageOpen,
+  Pencil,
   Search,
+  Trash2,
   X
 } from "lucide-react-native";
 import {
   ApiError,
+  deleteImport,
   deleteLogPhoto,
   getLogPhotos,
   getImportLogs,
   getImports,
   replaceLogPhoto,
+  updateImport,
   uploadLogPhoto
 } from "./api";
 import {
@@ -37,6 +41,7 @@ import {
   screenText
 } from "./components";
 import { LogPhotoManager } from "./LogPhotoManager";
+import { ImportEditModal } from "./ImportEditModal";
 import {
   removeStoredPhoto,
   storeCapturedPhoto
@@ -44,6 +49,7 @@ import {
 import { colors, shadows } from "./theme";
 import type {
   LogStatus,
+  ImportUpdateInput,
   PhotoFile,
   WoodImport,
   WoodLog,
@@ -79,6 +85,11 @@ export function ListsScreen({
   >(null);
   const [photoRevision, setPhotoRevision] = useState(0);
   const [fullPhotoId, setFullPhotoId] = useState<string | null>(null);
+  const [editingImport, setEditingImport] = useState<WoodImport | null>(null);
+  const [savingImport, setSavingImport] = useState(false);
+  const [deletingImportId, setDeletingImportId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   useEffect(() => {
     loadImports();
@@ -194,6 +205,87 @@ export function ListsScreen({
     setWoodType("all");
     setLogQuery("");
     setError(null);
+  }
+
+  function openImportEditor(item: WoodImport) {
+    setEditingImport(item);
+    setEditError(null);
+    setImportNotice(null);
+  }
+
+  async function saveImportChanges(value: ImportUpdateInput) {
+    const item = editingImport;
+
+    if (!item) {
+      return;
+    }
+
+    setSavingImport(true);
+    setEditError(null);
+
+    try {
+      const result = await updateImport(item.id, value);
+      setImports((current) =>
+        current.map((entry) =>
+          entry.id === result.import.id ? result.import : entry
+        )
+      );
+      setSelectedImport((current) =>
+        current?.id === result.import.id ? result.import : current
+      );
+      setEditingImport(null);
+      setImportNotice(result.message);
+      onDataChanged();
+    } catch (caught) {
+      setEditError(errorMessage(caught));
+    } finally {
+      setSavingImport(false);
+    }
+  }
+
+  function confirmDeleteImport(item: WoodImport) {
+    Alert.alert(
+      "Xóa file nhập gỗ?",
+      "File " +
+        item.originalFilename +
+        " cùng " +
+        item.totalLogs +
+        " cây và toàn bộ ảnh liên quan sẽ bị xóa. Thao tác này không thể hoàn tác.",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa file",
+          style: "destructive",
+          onPress: () => {
+            performDeleteImport(item).catch((caught) => {
+              setError(errorMessage(caught));
+            });
+          }
+        }
+      ]
+    );
+  }
+
+  async function performDeleteImport(item: WoodImport) {
+    setDeletingImportId(item.id);
+    setError(null);
+    setImportNotice(null);
+
+    try {
+      const result = await deleteImport(item.id);
+      setImports((current) => current.filter((entry) => entry.id !== item.id));
+      setSelectedImport((current) => (current?.id === item.id ? null : current));
+      setEditingImport((current) => (current?.id === item.id ? null : current));
+      setLogs((current) =>
+        current.filter((log) => log.importId !== item.id)
+      );
+      setImportNotice(result.message);
+      onDataChanged();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setDeletingImportId(null);
+    }
   }
 
   async function openLog(log: WoodLog) {
@@ -417,16 +509,16 @@ export function ListsScreen({
     return (
       <>
         <FlatList
-        data={visibleLogs}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.content}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        refreshing={loading}
-        onRefresh={() => loadLogs(selectedImport)}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListHeaderComponent={
-          <View style={styles.header}>
+          data={visibleLogs}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.content}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          refreshing={loading}
+          onRefresh={() => loadLogs(selectedImport)}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListHeaderComponent={
+            <View style={styles.header}>
             <View style={styles.detailTitleRow}>
               <IconButton
                 icon={ArrowLeft}
@@ -449,6 +541,19 @@ export function ListsScreen({
                   {selectedImport.originalFilename}
                 </Text>
               </View>
+              <View style={styles.detailActions}>
+                <IconButton
+                  icon={Pencil}
+                  label="Chỉnh sửa file"
+                  onPress={() => openImportEditor(selectedImport)}
+                />
+                <IconButton
+                  disabled={deletingImportId === selectedImport.id}
+                  icon={Trash2}
+                  label="Xóa file"
+                  onPress={() => confirmDeleteImport(selectedImport)}
+                />
+              </View>
             </View>
             <View style={styles.summaryBand}>
               <SummaryMetric
@@ -465,6 +570,11 @@ export function ListsScreen({
               />
             </View>
             <ShipmentInformation item={selectedImport} />
+            {importNotice ? (
+              <Notice title="Đã cập nhật" tone="success">
+                {importNotice}
+              </Notice>
+            ) : null}
             <View style={styles.logSearchRow}>
               <Search color={colors.muted} size={19} />
               <TextInput
@@ -499,49 +609,62 @@ export function ListsScreen({
             <Text style={styles.resultText}>
               {visibleLogs.length + " / " + logs.length + " cây"}
             </Text>
-          </View>
-        }
-        ListEmptyComponent={
-          !loading ? <EmptyState title="Không có cây phù hợp bộ lọc" /> : null
-        }
-        renderItem={({ item }) => (
-          <LogCard log={item} onPress={() => openLog(item)} />
-        )}
+            </View>
+          }
+          ListEmptyComponent={
+            !loading ? <EmptyState title="Không có cây phù hợp bộ lọc" /> : null
+          }
+          renderItem={({ item }) => (
+            <LogCard log={item} onPress={() => openLog(item)} />
+          )}
         />
         <LogPhotoManager
-        busyAction={busyPhotoAction}
-        fullPhotoId={fullPhotoId}
-        loading={loadingPhotos}
-        log={selectedLog}
-        notice={photoNotice}
-        onAdd={() => capturePhoto("add")}
-        onClose={closeLog}
-        onCloseFullPhoto={() => setFullPhotoId(null)}
-        onDelete={confirmDeletePhoto}
-        onOpenFullPhoto={setFullPhotoId}
-        onReplace={() => capturePhoto("replace")}
-        onSelectPhoto={setSelectedPhotoId}
-        photoError={photoError}
-        photoRevision={photoRevision}
-        photos={photos}
-        selectedPhotoId={selectedPhotoId}
+          busyAction={busyPhotoAction}
+          fullPhotoId={fullPhotoId}
+          loading={loadingPhotos}
+          log={selectedLog}
+          notice={photoNotice}
+          onAdd={() => capturePhoto("add")}
+          onClose={closeLog}
+          onCloseFullPhoto={() => setFullPhotoId(null)}
+          onDelete={confirmDeletePhoto}
+          onOpenFullPhoto={setFullPhotoId}
+          onReplace={() => capturePhoto("replace")}
+          onSelectPhoto={setSelectedPhotoId}
+          photoError={photoError}
+          photoRevision={photoRevision}
+          photos={photos}
+          selectedPhotoId={selectedPhotoId}
+        />
+        <ImportEditModal
+          busy={savingImport}
+          error={editError}
+          item={editingImport}
+          onClose={() => {
+            if (!savingImport) {
+              setEditingImport(null);
+              setEditError(null);
+            }
+          }}
+          onSave={saveImportChanges}
         />
       </>
     );
   }
 
   return (
-    <FlatList
-      data={visibleImports}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.content}
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      refreshing={loading}
-      onRefresh={loadImports}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-      ListHeaderComponent={
-        <View style={styles.header}>
+    <>
+      <FlatList
+        data={visibleImports}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.content}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        refreshing={loading}
+        onRefresh={loadImports}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={
+          <View style={styles.header}>
           <Text style={screenText.title}>Các danh sách gỗ</Text>
           <View style={styles.logSearchRow}>
             <Search color={colors.muted} size={19} />
@@ -568,14 +691,19 @@ export function ListsScreen({
               {error}
             </Notice>
           ) : null}
+          {importNotice ? (
+            <Notice title="Đã cập nhật" tone="success">
+              {importNotice}
+            </Notice>
+          ) : null}
           <Text style={styles.resultText}>
             {visibleImports.length + " / " + imports.length + " file"}
           </Text>
-        </View>
-      }
-      ListEmptyComponent={
-        !loading ? (
-          <EmptyState
+          </View>
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <EmptyState
             message={
               imports.length > 0
                 ? "Hãy thử một phần khác của tên file, mã lô hoặc tên tàu."
@@ -586,13 +714,32 @@ export function ListsScreen({
                 ? "Không tìm thấy file phù hợp"
                 : "Chưa có danh sách nào"
             }
+            />
+          ) : null
+        }
+        renderItem={({ item }) => (
+          <ImportRow
+            deleting={deletingImportId === item.id}
+            item={item}
+            onDelete={() => confirmDeleteImport(item)}
+            onEdit={() => openImportEditor(item)}
+            onPress={() => openImport(item)}
           />
-        ) : null
-      }
-      renderItem={({ item }) => (
-        <ImportRow item={item} onPress={() => openImport(item)} />
-      )}
-    />
+        )}
+      />
+      <ImportEditModal
+        busy={savingImport}
+        error={editError}
+        item={editingImport}
+        onClose={() => {
+          if (!savingImport) {
+            setEditingImport(null);
+            setEditError(null);
+          }
+        }}
+        onSave={saveImportChanges}
+      />
+    </>
   );
 }
 
@@ -648,10 +795,16 @@ function WoodTypeFilter({
 
 function ImportRow({
   item,
-  onPress
+  deleting,
+  onPress,
+  onEdit,
+  onDelete
 }: {
   item: WoodImport;
+  deleting: boolean;
   onPress: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const progress =
     item.totalLogs === 0 ? 0 : item.receivedLogs / item.totalLogs;
@@ -660,63 +813,74 @@ function ImportRow({
   const displayName = importDisplayName(item);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.importRow,
-        { opacity: pressed ? 0.82 : 1 }
-      ]}
-    >
-      <View style={styles.listIcon}>
-        <ShipmentIcon color={colors.primary} size={23} />
-      </View>
-      <View style={styles.importBody}>
-        <Text style={styles.importCode} numberOfLines={1}>
-          {displayName}
-        </Text>
-        <Text style={styles.importMeta} numberOfLines={1}>
-          {item.shipmentType === "container"
-            ? item.listCode +
-              " · " +
-              item.container20Count +
-              " Cont 20' · " +
-              item.container40Count +
-              " Cont 40'"
-            : item.listCode + " · Hàng rời"}
-        </Text>
-        <Text style={styles.importMeta} numberOfLines={1}>
-          {(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
-        </Text>
-        <Text style={styles.importMeta} numberOfLines={2}>
-          {(item.woodSpecies || "--") +
-            " · Nơi lấy: " +
-            (item.shipmentType === "container"
-              ? item.containerPickupLocation || "--"
-              : item.woodPickupLocation || "--")}
-        </Text>
-        <Text style={styles.importMeta} numberOfLines={1}>
-          {formatImportDate(item.intakeStartDate) +
-            " · Tổng " +
-            formatImportQuantity(item)}
-        </Text>
-        <Text style={styles.importMeta} numberOfLines={1}>
-          {"Tổng khối lượng: " + formatDeclaredVolume(item)}
-        </Text>
-        <Text style={styles.importProgressText}>
-          {item.receivedLogs + "/" + item.totalLogs + " cây đã nhận"}
-        </Text>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: (Math.round(progress * 100) + "%") as DimensionValue }
-            ]}
-          />
+    <View style={styles.importRow}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.importOpenArea,
+          { opacity: pressed ? 0.82 : 1 }
+        ]}
+      >
+        <View style={styles.listIcon}>
+          <ShipmentIcon color={colors.primary} size={23} />
         </View>
+        <View style={styles.importBody}>
+          <Text style={styles.importCode} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.importMeta} numberOfLines={1}>
+            {item.shipmentType === "container"
+              ? item.listCode +
+                " · " +
+                item.container20Count +
+                " Cont 20' · " +
+                item.container40Count +
+                " Cont 40'"
+              : item.listCode + " · Hàng rời"}
+          </Text>
+          <Text style={styles.importMeta} numberOfLines={1}>
+            {(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
+          </Text>
+          <Text style={styles.importMeta} numberOfLines={2}>
+            {(item.woodSpecies || "--") +
+              " · Nơi lấy: " +
+              (item.shipmentType === "container"
+                ? item.containerPickupLocation || "--"
+                : item.woodPickupLocation || "--")}
+          </Text>
+          <Text style={styles.importMeta} numberOfLines={1}>
+            {formatImportDate(item.intakeStartDate) +
+              " · Tổng " +
+              formatImportQuantity(item)}
+          </Text>
+          <Text style={styles.importMeta} numberOfLines={1}>
+            {"Tổng khối lượng: " + formatDeclaredVolume(item)}
+          </Text>
+          <Text style={styles.importProgressText}>
+            {item.receivedLogs + " đã nhập · " + item.pendingLogs + " còn lại"}
+          </Text>
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: (Math.round(progress * 100) + "%") as DimensionValue }
+              ]}
+            />
+          </View>
+        </View>
+        <ChevronRight color={colors.muted} size={22} />
+      </Pressable>
+      <View style={styles.importActions}>
+        <IconButton icon={Pencil} label="Chỉnh sửa file" onPress={onEdit} />
+        <IconButton
+          disabled={deleting}
+          icon={Trash2}
+          label="Xóa file"
+          onPress={onDelete}
+        />
       </View>
-      <ChevronRight color={colors.muted} size={22} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -911,14 +1075,30 @@ const styles = StyleSheet.create({
   importRow: {
     minHeight: 170,
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    padding: 13,
+    overflow: "hidden",
     ...shadows.card
+  },
+  importOpenArea: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 13
+  },
+  importActions: {
+    width: 48,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 8,
+    paddingTop: 9,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    backgroundColor: colors.background
   },
   listIcon: {
     width: 44,
@@ -972,6 +1152,11 @@ const styles = StyleSheet.create({
   detailIdentity: {
     flex: 1,
     minWidth: 0
+  },
+  detailActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2
   },
   detailCode: {
     color: colors.ink,

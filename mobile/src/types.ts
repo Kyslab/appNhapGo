@@ -19,6 +19,10 @@ export type ImportDetailsInput = {
   declaredVolumeCbm: string;
 };
 
+export type ImportUpdateInput = ImportDetailsInput & {
+  originalFilename: string;
+};
+
 export type WoodLog = {
   id: string;
   importId: string;
