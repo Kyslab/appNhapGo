@@ -20,5 +20,4 @@ COPY --from=build /app/api/dist ./api/dist
 COPY --from=build /app/api/db ./api/db
 
 EXPOSE 4000
-CMD ["node", "api/dist/server.js"]
-
+CMD ["sh", "-c", "node api/dist/migrate.js && exec node api/dist/server.js"]

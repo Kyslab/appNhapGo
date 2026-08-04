@@ -65,6 +65,8 @@ npx eas build --platform android --profile preview
 
 ## Triển khai API
 
+Để cài app Android dùng URL HTTPS cố định, không cần IP LAN hoặc Expo Go, làm theo [DEPLOY_ANDROID.md](./DEPLOY_ANDROID.md).
+
 Dockerfile dùng build context ở thư mục gốc:
 
 ```powershell
@@ -83,4 +85,3 @@ npm run build:api
 ```
 
 Unit test bao phủ nhận diện dòng tiêu đề, ánh xạ cột, bỏ dòng tổng và chống trùng Log trong cùng workbook. API còn chống nhập trùng toàn bộ file bằng SHA-256 và chống lưu trùng ảnh cho cùng một cây.
-

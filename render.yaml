@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kyslab-appnhapgo-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/db
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: NODE_ENV
+        value: production
