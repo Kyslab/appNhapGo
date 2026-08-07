@@ -8,9 +8,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import {
-  FileUp,
   Layers3,
-  ListTree,
   Search,
   Warehouse,
   type LucideProps
@@ -20,19 +18,15 @@ import {
   SafeAreaProvider,
   SafeAreaView
 } from "react-native-safe-area-context";
-import { ImportScreen } from "./src/ImportScreen";
-import { ListsScreen } from "./src/ListsScreen";
 import { SearchScreen } from "./src/SearchScreen";
 import { WarehouseScreen } from "./src/WarehouseScreen";
 import { colors } from "./src/theme";
 
-type Tab = "search" | "import" | "lists" | "warehouse";
+type Tab = "search" | "warehouse";
 type IconType = ComponentType<LucideProps>;
 
 const tabs: { id: Tab; label: string; icon: IconType }[] = [
   { id: "search", label: "Tra Log", icon: Search },
-  { id: "import", label: "Nhập Excel", icon: FileUp },
-  { id: "lists", label: "Danh sách", icon: ListTree },
   { id: "warehouse", label: "Nhập kho", icon: Warehouse }
 ];
 
@@ -60,15 +54,6 @@ export default function App() {
         <View style={styles.content}>
           {activeTab === "search" ? (
             <SearchScreen onDataChanged={markDataChanged} />
-          ) : null}
-          {activeTab === "import" ? (
-            <ImportScreen onImported={markDataChanged} />
-          ) : null}
-          {activeTab === "lists" ? (
-            <ListsScreen
-              onDataChanged={markDataChanged}
-              refreshKey={dataVersion}
-            />
           ) : null}
           {activeTab === "warehouse" ? (
             <WarehouseScreen refreshKey={dataVersion} />
