@@ -35,9 +35,16 @@ import {
 } from "./components";
 import { colors } from "./theme";
 import { PhotoImage, storeCapturedPhoto } from "./PhotoImage";
-import type { WoodLog } from "./types";
+import { IntakeInfoModal } from "./IntakeInfoModal";
+import {
+  formatIntakeTime,
+  loadLastVehiclePlate,
+  rememberVehiclePlate
+} from "./intake";
+import type { IntakeDetails, WoodLog } from "./types";
 
 const PENDING_CAMERA_LOG = "appNhapGo.pendingCameraLogId";
+const PENDING_CAMERA_CONTEXT = "appNhapGo.pendingCameraContext";
 
 export function SearchScreen({
   onDataChanged
@@ -52,12 +59,31 @@ export function SearchScreen({
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [lastVehiclePlate, setLastVehiclePlate] = useState("");
+  const [captureRequest, setCaptureRequest] = useState<{
+    log: WoodLog;
+    capturedAt: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function recoverPendingCamera() {
-      const logId = await AsyncStorage.getItem(PENDING_CAMERA_LOG);
+      const [storedContext, legacyLogId] = await Promise.all([
+        AsyncStorage.getItem(PENDING_CAMERA_CONTEXT),
+        AsyncStorage.getItem(PENDING_CAMERA_LOG)
+      ]);
+      let context: ({ logId: string } & IntakeDetails) | null = null;
+
+      if (storedContext) {
+        try {
+          context = JSON.parse(storedContext) as { logId: string } & IntakeDetails;
+        } catch {
+          context = null;
+        }
+      }
+
+      const logId = context?.logId ?? legacyLogId;
 
       if (!logId) {
         return;
@@ -72,7 +98,10 @@ export function SearchScreen({
           pending.assets &&
           pending.assets[0]
         ) {
-          await saveCapturedPhoto(logId, pending.assets[0]);
+          await saveCapturedPhoto(logId, pending.assets[0], {
+            capturedAt: context?.capturedAt ?? new Date().toISOString(),
+            vehiclePlate: context?.vehiclePlate ?? ""
+          });
 
           if (active) {
             setNotice("Ảnh camera đã được khôi phục và lưu vào cây gỗ.");
@@ -83,9 +112,20 @@ export function SearchScreen({
           setError(errorMessage(caught));
         }
       } finally {
-        await AsyncStorage.removeItem(PENDING_CAMERA_LOG);
+        await Promise.all([
+          AsyncStorage.removeItem(PENDING_CAMERA_LOG),
+          AsyncStorage.removeItem(PENDING_CAMERA_CONTEXT)
+        ]);
       }
     }
+
+    loadLastVehiclePlate()
+      .then((value) => {
+        if (active) {
+          setLastVehiclePlate(value);
+        }
+      })
+      .catch(() => undefined);
 
     recoverPendingCamera().catch((caught) => {
       if (active) {
@@ -130,7 +170,8 @@ export function SearchScreen({
 
   async function saveCapturedPhoto(
     logId: string,
-    asset: ImagePicker.ImagePickerAsset
+    asset: ImagePicker.ImagePickerAsset,
+    intake: IntakeDetails
   ) {
     const context = ExpoImageManipulator.ImageManipulator.manipulate(asset.uri);
 
@@ -143,11 +184,15 @@ export function SearchScreen({
       format: ExpoImageManipulator.SaveFormat.JPEG,
       compress: 0.72
     });
-    const response = await uploadLogPhoto(logId, {
-      uri: compressed.uri,
-      name: "log-" + logId + "-" + Date.now() + ".jpg",
-      mimeType: "image/jpeg"
-    });
+    const response = await uploadLogPhoto(
+      logId,
+      {
+        uri: compressed.uri,
+        name: "log-" + logId + "-" + Date.now() + ".jpg",
+        mimeType: "image/jpeg"
+      },
+      intake
+    );
 
     try {
       await storeCapturedPhoto(response.photoId, compressed.uri);
@@ -161,7 +206,8 @@ export function SearchScreen({
           ? {
               ...log,
               status: "received",
-              receivedAt: log.receivedAt ?? new Date().toISOString(),
+              vehiclePlate: response.vehiclePlate,
+              receivedAt: response.receivedAt,
               photoCount: response.photoCount,
               latestPhotoId: response.photoId
             }
@@ -173,7 +219,8 @@ export function SearchScreen({
         ? {
             ...current,
             status: "received",
-            receivedAt: current.receivedAt ?? new Date().toISOString(),
+            vehiclePlate: response.vehiclePlate,
+            receivedAt: response.receivedAt,
             photoCount: response.photoCount,
             latestPhotoId: response.photoId
           }
@@ -182,7 +229,7 @@ export function SearchScreen({
     onDataChanged();
   }
 
-  async function capturePhoto(log: WoodLog) {
+  async function capturePhoto(log: WoodLog, intake: IntakeDetails) {
     setBusyLogId(log.id);
     setError(null);
     setNotice(null);
@@ -198,7 +245,13 @@ export function SearchScreen({
         return;
       }
 
-      await AsyncStorage.setItem(PENDING_CAMERA_LOG, log.id);
+      await Promise.all([
+        AsyncStorage.setItem(PENDING_CAMERA_LOG, log.id),
+        AsyncStorage.setItem(
+          PENDING_CAMERA_CONTEXT,
+          JSON.stringify({ logId: log.id, ...intake })
+        )
+      ]);
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
@@ -206,18 +259,44 @@ export function SearchScreen({
       });
 
       if (result.canceled || !result.assets[0]) {
-        await AsyncStorage.removeItem(PENDING_CAMERA_LOG);
+        await Promise.all([
+          AsyncStorage.removeItem(PENDING_CAMERA_LOG),
+          AsyncStorage.removeItem(PENDING_CAMERA_CONTEXT)
+        ]);
         return;
       }
 
-      await saveCapturedPhoto(log.id, result.assets[0]);
-      await AsyncStorage.removeItem(PENDING_CAMERA_LOG);
+      await saveCapturedPhoto(log.id, result.assets[0], intake);
+      await Promise.all([
+        AsyncStorage.removeItem(PENDING_CAMERA_LOG),
+        AsyncStorage.removeItem(PENDING_CAMERA_CONTEXT)
+      ]);
       setNotice("Đã lưu ảnh và xác nhận cây " + log.logNo + " về kho.");
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       setBusyLogId(null);
     }
+  }
+
+  function requestCapture(log: WoodLog) {
+    setCaptureRequest({ log, capturedAt: new Date().toISOString() });
+  }
+
+  function confirmCapture(vehiclePlate: string) {
+    const pending = captureRequest;
+
+    if (!pending) {
+      return;
+    }
+
+    const intake = { vehiclePlate, capturedAt: pending.capturedAt };
+    setCaptureRequest(null);
+    setLastVehiclePlate(vehiclePlate);
+    rememberVehiclePlate(vehiclePlate).catch(() => undefined);
+    capturePhoto(pending.log, intake).catch((caught) => {
+      setError(errorMessage(caught));
+    });
   }
 
   return (
@@ -338,6 +417,14 @@ export function SearchScreen({
                   label="Ảnh đã lưu"
                   value={String(selectedLog.photoCount)}
                 />
+                <DetailRow
+                  label="Biển số xe"
+                  value={selectedLog.vehiclePlate || "--"}
+                />
+                <DetailRow
+                  label="Thời gian nhập"
+                  value={formatIntakeTime(selectedLog.receivedAt)}
+                />
               </View>
 
               {selectedLog.latestPhotoId ? (
@@ -360,12 +447,21 @@ export function SearchScreen({
                 label={
                   selectedLog.photoCount > 0 ? "Chụp thêm ảnh" : "Chụp ảnh cây"
                 }
-                onPress={() => capturePhoto(selectedLog)}
+                onPress={() => requestCapture(selectedLog)}
               />
             </View>
           ) : null}
         </View>
       </Modal>
+      <IntakeInfoModal
+        capturedAt={captureRequest?.capturedAt ?? new Date().toISOString()}
+        initialVehiclePlate={
+          captureRequest?.log.vehiclePlate || lastVehiclePlate
+        }
+        onClose={() => setCaptureRequest(null)}
+        onConfirm={confirmCapture}
+        visible={captureRequest !== null}
+      />
     </View>
   );
 }

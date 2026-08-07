@@ -42,6 +42,11 @@ import {
 } from "./components";
 import { LogPhotoManager } from "./LogPhotoManager";
 import { ImportEditModal } from "./ImportEditModal";
+import { IntakeInfoModal } from "./IntakeInfoModal";
+import {
+  loadLastVehiclePlate,
+  rememberVehiclePlate
+} from "./intake";
 import {
   removeStoredPhoto,
   storeCapturedPhoto
@@ -50,6 +55,7 @@ import { colors, shadows } from "./theme";
 import type {
   LogStatus,
   ImportUpdateInput,
+  IntakeDetails,
   PhotoFile,
   WoodImport,
   WoodLog,
@@ -90,10 +96,20 @@ export function ListsScreen({
   const [deletingImportId, setDeletingImportId] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [lastVehiclePlate, setLastVehiclePlate] = useState("");
+  const [captureRequest, setCaptureRequest] = useState<{
+    capturedAt: string;
+  } | null>(null);
 
   useEffect(() => {
     loadImports();
   }, [refreshKey]);
+
+  useEffect(() => {
+    loadLastVehiclePlate()
+      .then(setLastVehiclePlate)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (selectedImport) {
@@ -362,6 +378,7 @@ export function ListsScreen({
     logId: string,
     change: Pick<WoodLog, "status" | "photoCount" | "latestPhotoId"> & {
       receivedAt: string | null;
+      vehiclePlate: string | null;
     }
   ) {
     setLogs((current) =>
@@ -382,7 +399,10 @@ export function ListsScreen({
     );
   }
 
-  async function capturePhoto(mode: "add" | "replace") {
+  async function capturePhoto(
+    mode: "add" | "replace",
+    intake: IntakeDetails
+  ) {
     const log = selectedLog;
     const replacingPhotoId = selectedPhotoId;
 
@@ -403,8 +423,8 @@ export function ListsScreen({
 
       const result =
         mode === "replace" && replacingPhotoId
-          ? await replaceLogPhoto(replacingPhotoId, photo)
-          : await uploadLogPhoto(log.id, photo);
+          ? await replaceLogPhoto(replacingPhotoId, photo, intake)
+          : await uploadLogPhoto(log.id, photo, intake);
 
       try {
         await storeCapturedPhoto(result.photoId, photo.uri);
@@ -416,7 +436,8 @@ export function ListsScreen({
       setSelectedPhotoId(result.photoId);
       updateLogPhotoState(log.id, {
         status: "received",
-        receivedAt: log.receivedAt ?? new Date().toISOString(),
+        receivedAt: result.receivedAt,
+        vehiclePlate: result.vehiclePlate,
         photoCount: result.photoCount,
         latestPhotoId: result.latestPhotoId ?? result.photoId
       });
@@ -434,6 +455,28 @@ export function ListsScreen({
     } finally {
       setBusyPhotoAction(null);
     }
+  }
+
+  function requestIntakeCapture() {
+    if (selectedLog) {
+      setCaptureRequest({ capturedAt: new Date().toISOString() });
+    }
+  }
+
+  function confirmIntakeCapture(vehiclePlate: string) {
+    const pending = captureRequest;
+
+    if (!pending) {
+      return;
+    }
+
+    setCaptureRequest(null);
+    setLastVehiclePlate(vehiclePlate);
+    rememberVehiclePlate(vehiclePlate).catch(() => undefined);
+    capturePhoto("add", {
+      vehiclePlate,
+      capturedAt: pending.capturedAt
+    }).catch((caught) => setPhotoError(errorMessage(caught)));
   }
 
   function confirmDeletePhoto() {
@@ -479,7 +522,8 @@ export function ListsScreen({
       setSelectedPhotoId(result.latestPhotoId);
       updateLogPhotoState(log.id, {
         status: result.status,
-        receivedAt: result.status === "received" ? log.receivedAt : null,
+        receivedAt: result.receivedAt,
+        vehiclePlate: result.vehiclePlate,
         photoCount: result.photoCount,
         latestPhotoId: result.latestPhotoId
       });
@@ -624,17 +668,29 @@ export function ListsScreen({
           loading={loadingPhotos}
           log={selectedLog}
           notice={photoNotice}
-          onAdd={() => capturePhoto("add")}
+          onAdd={requestIntakeCapture}
           onClose={closeLog}
           onCloseFullPhoto={() => setFullPhotoId(null)}
           onDelete={confirmDeletePhoto}
           onOpenFullPhoto={setFullPhotoId}
-          onReplace={() => capturePhoto("replace")}
+          onReplace={() =>
+            capturePhoto("replace", {
+              vehiclePlate: selectedLog?.vehiclePlate ?? "",
+              capturedAt: new Date().toISOString()
+            })
+          }
           onSelectPhoto={setSelectedPhotoId}
           photoError={photoError}
           photoRevision={photoRevision}
           photos={photos}
           selectedPhotoId={selectedPhotoId}
+        />
+        <IntakeInfoModal
+          capturedAt={captureRequest?.capturedAt ?? new Date().toISOString()}
+          initialVehiclePlate={selectedLog?.vehiclePlate || lastVehiclePlate}
+          onClose={() => setCaptureRequest(null)}
+          onConfirm={confirmIntakeCapture}
+          visible={captureRequest !== null}
         />
         <ImportEditModal
           busy={savingImport}

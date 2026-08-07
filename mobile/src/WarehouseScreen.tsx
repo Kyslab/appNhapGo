@@ -11,8 +11,10 @@ import {
 } from "react-native";
 import {
   Camera,
+  CarFront,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   FileSpreadsheet,
   Images,
   X
@@ -31,6 +33,7 @@ import {
 } from "./components";
 import { colors, shadows } from "./theme";
 import { PhotoImage } from "./PhotoImage";
+import { formatIntakeTime } from "./intake";
 import type {
   WarehouseOverview,
   WoodImport,
@@ -269,6 +272,22 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
                     </Text>
                   </View>
                 </View>
+                <View style={styles.intakeMetaBand}>
+                  <View style={styles.intakeMetaRow}>
+                    <CarFront color={colors.primary} size={17} />
+                    <Text style={styles.intakeMetaLabel}>Biển số xe</Text>
+                    <Text style={styles.intakeMetaValue} numberOfLines={1}>
+                      {selectedLog.vehiclePlate || "--"}
+                    </Text>
+                  </View>
+                  <View style={styles.intakeMetaRow}>
+                    <Clock3 color={colors.blue} size={17} />
+                    <Text style={styles.intakeMetaLabel}>Thời gian nhập</Text>
+                    <Text style={styles.intakeMetaValue} numberOfLines={1}>
+                      {formatIntakeTime(selectedLog.receivedAt)}
+                    </Text>
+                  </View>
+                </View>
 
                 {loadingPhotos ? (
                   <View style={styles.loadingPhotos}>
@@ -311,12 +330,18 @@ export function WarehouseScreen({ refreshKey }: { refreshKey: number }) {
                         );
                       })}
                     </ScrollView>
-                    <Text style={styles.capturedText}>
-                      {formatCapturedAt(
-                        photos.find((photo) => photo.id === currentPhotoId)
-                          ?.capturedAt
-                      )}
-                    </Text>
+                    <View style={styles.selectedPhotoMeta}>
+                      <Text style={styles.capturedText} numberOfLines={1}>
+                        {photos.find((photo) => photo.id === currentPhotoId)
+                          ?.vehiclePlate || "Chưa có biển số"}
+                      </Text>
+                      <Text style={styles.capturedText} numberOfLines={1}>
+                        {formatIntakeTime(
+                          photos.find((photo) => photo.id === currentPhotoId)
+                            ?.capturedAt
+                        )}
+                      </Text>
+                    </View>
                   </>
                 ) : null}
               </ScrollView>
@@ -426,9 +451,14 @@ function WarehouseRow({
         <View style={styles.rowMeta}>
           <Camera color={colors.primary} size={14} />
           <Text style={styles.rowMetaText}>{log.photoCount + " ảnh"}</Text>
+          <Text style={styles.rowMetaDivider}>·</Text>
+          <CarFront color={colors.primary} size={14} />
+          <Text style={styles.rowMetaText} numberOfLines={1}>
+            {log.vehiclePlate || "Chưa có biển số"}
+          </Text>
         </View>
         <Text style={styles.rowDate} numberOfLines={1}>
-          {formatCapturedAt(log.receivedAt)}
+          {formatIntakeTime(log.receivedAt)}
         </Text>
       </View>
       <ChevronRight color={colors.muted} size={22} />
@@ -451,26 +481,6 @@ function errorMessage(caught: unknown, fallback: string): string {
   return caught instanceof ApiError || caught instanceof Error
     ? caught.message
     : fallback;
-}
-
-function formatCapturedAt(value?: string | null): string {
-  if (!value) {
-    return "Chưa có thời gian chụp";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Chưa có thời gian chụp";
-  }
-
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).format(date);
 }
 
 const styles = StyleSheet.create({
@@ -642,9 +652,15 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   rowMetaText: {
+    flexShrink: 1,
     color: colors.primary,
     fontSize: 12,
     fontWeight: "800",
+    letterSpacing: 0
+  },
+  rowMetaDivider: {
+    color: colors.border,
+    fontSize: 12,
     letterSpacing: 0
   },
   rowDate: {
@@ -746,6 +762,34 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0
   },
+  intakeMetaBand: {
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border
+  },
+  intakeMetaRow: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  intakeMetaLabel: {
+    width: 92,
+    color: colors.muted,
+    fontSize: 11,
+    letterSpacing: 0
+  },
+  intakeMetaValue: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "right",
+    letterSpacing: 0
+  },
   loadingPhotos: {
     minHeight: 50,
     alignItems: "center",
@@ -773,8 +817,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   capturedText: {
+    flex: 1,
+    minWidth: 0,
     color: colors.muted,
     fontSize: 11,
     letterSpacing: 0
+  },
+  selectedPhotoMeta: {
+    flexDirection: "row",
+    gap: 12
   }
 });

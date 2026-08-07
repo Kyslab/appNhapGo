@@ -18,6 +18,7 @@ import {
   parseImportDetails,
   parseImportFilename
 } from "./import-details.js";
+import { parseVehiclePlate, VehiclePlateError } from "./intake-details.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
@@ -71,6 +72,7 @@ const LOG_SELECT = `
     l.volume_cbm,
     l.source_row,
     l.status,
+    l.vehicle_plate,
     l.received_at,
     i.list_code,
     i.original_filename,
@@ -113,6 +115,7 @@ function mapLog(row: DatabaseRow) {
     volumeCbm: asNumber(row.volume_cbm),
     sourceRow: asNumber(row.source_row),
     status: row.status,
+    vehiclePlate: row.vehicle_plate,
     receivedAt: row.received_at,
     photoCount: asNumber(row.photo_count) ?? 0,
     latestPhotoId: row.latest_photo_id
@@ -126,6 +129,7 @@ function mapPhoto(row: DatabaseRow) {
     mimeType: row.mime_type,
     originalFilename: row.original_filename,
     byteSize: asNumber(row.byte_size) ?? 0,
+    vehiclePlate: row.vehicle_plate,
     capturedAt: row.captured_at,
     createdAt: row.created_at
   };
@@ -543,6 +547,7 @@ app.get("/api/logs/:id/photos", async (request, response) => {
         mime_type,
         original_filename,
         byte_size,
+        vehicle_plate,
         captured_at,
         created_at
       FROM wood_log_photos
@@ -566,12 +571,13 @@ app.post(
       return;
     }
 
-    const client = await pool.connect();
     const sha256 = createHash("sha256").update(request.file.buffer).digest("hex");
     const requestedDate = new Date(String(request.body.capturedAt ?? ""));
     const capturedAt = Number.isNaN(requestedDate.getTime())
       ? new Date()
       : requestedDate;
+    const vehiclePlate = parseVehiclePlate(request.body.vehiclePlate);
+    const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
@@ -595,9 +601,10 @@ app.post(
             original_filename,
             byte_size,
             sha256,
+            vehicle_plate,
             captured_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           ON CONFLICT (log_id, sha256) DO NOTHING
           RETURNING id
         `,
@@ -608,6 +615,7 @@ app.post(
           request.file.originalname,
           request.file.size,
           sha256,
+          vehiclePlate,
           capturedAt
         ]
       );
@@ -622,16 +630,18 @@ app.post(
         photoId = existingPhoto.rows[0].id as string;
       }
 
-      await client.query(
+      const updatedLog = await client.query(
         `
           UPDATE wood_logs
           SET
             status = 'received',
             received_at = COALESCE(received_at, $2),
+            vehicle_plate = COALESCE($3, vehicle_plate),
             updated_at = now()
           WHERE id = $1
+          RETURNING received_at, vehicle_plate
         `,
-        [request.params.id, capturedAt]
+        [request.params.id, capturedAt, vehiclePlate]
       );
       const photoCountResult = await client.query(
         `
@@ -658,7 +668,9 @@ app.post(
         photoId,
         photoCount: Number(photoCountResult.rows[0].count),
         latestPhotoId: photoCountResult.rows[0].latest_photo_id,
-        status: "received"
+        status: "received",
+        receivedAt: updatedLog.rows[0].received_at,
+        vehiclePlate: updatedLog.rows[0].vehicle_plate
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -678,12 +690,13 @@ app.put(
       return;
     }
 
-    const client = await pool.connect();
     const sha256 = createHash("sha256").update(request.file.buffer).digest("hex");
     const requestedDate = new Date(String(request.body.capturedAt ?? ""));
     const capturedAt = Number.isNaN(requestedDate.getTime())
       ? new Date()
       : requestedDate;
+    const vehiclePlate = parseVehiclePlate(request.body.vehiclePlate);
+    const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
@@ -725,7 +738,8 @@ app.put(
             original_filename = $4,
             byte_size = $5,
             sha256 = $6,
-            captured_at = $7
+            captured_at = $7,
+            vehicle_plate = COALESCE($8, vehicle_plate)
           WHERE id = $1
         `,
         [
@@ -735,19 +749,22 @@ app.put(
           request.file.originalname,
           request.file.size,
           sha256,
-          capturedAt
+          capturedAt,
+          vehiclePlate
         ]
       );
-      await client.query(
+      const updatedLog = await client.query(
         `
           UPDATE wood_logs
           SET
             status = 'received',
             received_at = COALESCE(received_at, $2),
+            vehicle_plate = COALESCE($3, vehicle_plate),
             updated_at = now()
           WHERE id = $1
+          RETURNING received_at, vehicle_plate
         `,
-        [logId, capturedAt]
+        [logId, capturedAt, vehiclePlate]
       );
       const countResult = await client.query(
         "SELECT count(*)::int AS count FROM wood_log_photos WHERE log_id = $1",
@@ -760,7 +777,9 @@ app.put(
         photoId: request.params.id,
         photoCount: Number(countResult.rows[0].count),
         latestPhotoId: request.params.id,
-        status: "received"
+        status: "received",
+        receivedAt: updatedLog.rows[0].received_at,
+        vehiclePlate: updatedLog.rows[0].vehicle_plate
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -793,7 +812,7 @@ app.delete("/api/photos/:id", async (request, response) => {
     ]);
     const remainingResult = await client.query(
       `
-        SELECT id
+        SELECT id, vehicle_plate, captured_at
         FROM wood_log_photos
         WHERE log_id = $1
         ORDER BY captured_at DESC, created_at DESC
@@ -802,20 +821,23 @@ app.delete("/api/photos/:id", async (request, response) => {
     );
     const photoCount = remainingResult.rowCount ?? 0;
     const status = photoCount > 0 ? "received" : "pending";
+    const oldestPhoto = remainingResult.rows[photoCount - 1];
+    const vehiclePlate = remainingResult.rows.find(
+      (row) => row.vehicle_plate
+    )?.vehicle_plate ?? null;
+    const receivedAt = oldestPhoto?.captured_at ?? null;
 
     await client.query(
       `
         UPDATE wood_logs
         SET
           status = $2,
-          received_at = CASE
-            WHEN $2 = 'pending' THEN NULL
-            ELSE COALESCE(received_at, now())
-          END,
+          received_at = $3,
+          vehicle_plate = $4,
           updated_at = now()
         WHERE id = $1
       `,
-      [logId, status]
+      [logId, status, receivedAt, vehiclePlate]
     );
     await client.query("COMMIT");
 
@@ -824,7 +846,9 @@ app.delete("/api/photos/:id", async (request, response) => {
       deletedPhotoId: request.params.id,
       photoCount,
       latestPhotoId: (remainingResult.rows[0]?.id as string | undefined) ?? null,
-      status
+      status,
+      receivedAt,
+      vehiclePlate
     });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -869,7 +893,8 @@ app.use(
 
     if (
       error instanceof WorkbookImportError ||
-      error instanceof ImportDetailsError
+      error instanceof ImportDetailsError ||
+      error instanceof VehiclePlateError
     ) {
       response.status(400).json({ message: error.message });
       return;

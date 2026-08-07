@@ -4,6 +4,7 @@ import { File, UploadType } from "expo-file-system";
 import type {
   ImportDetailsInput,
   ImportUpdateInput,
+  IntakeDetails,
   PhotoFile,
   WarehouseOverview,
   WoodImport,
@@ -169,7 +170,8 @@ export async function getLogPhotos(logId: string): Promise<WoodLogPhoto[]> {
 async function sendPhoto(
   path: string,
   httpMethod: "POST" | "PUT",
-  photo: PhotoFile
+  photo: PhotoFile,
+  intake: IntakeDetails
 ) {
   const file = new File(photo.uri);
   let result;
@@ -182,7 +184,10 @@ async function sendPhoto(
         headers: apiHeaders(),
         httpMethod,
         mimeType: photo.mimeType,
-        parameters: { capturedAt: new Date().toISOString() },
+        parameters: {
+          capturedAt: intake.capturedAt,
+          vehiclePlate: intake.vehiclePlate
+        },
         uploadType: UploadType.MULTIPART
       }
     );
@@ -199,22 +204,34 @@ async function sendPhoto(
     photoCount: number;
     latestPhotoId?: string;
     status: "received";
+    receivedAt: string;
+    vehiclePlate: string | null;
   }>(result.body, result.status >= 200 && result.status < 300);
 }
 
-export async function uploadLogPhoto(logId: string, photo: PhotoFile) {
+export async function uploadLogPhoto(
+  logId: string,
+  photo: PhotoFile,
+  intake: IntakeDetails
+) {
   return sendPhoto(
     "/api/logs/" + encodeURIComponent(logId) + "/photos",
     "POST",
-    photo
+    photo,
+    intake
   );
 }
 
-export async function replaceLogPhoto(photoId: string, photo: PhotoFile) {
+export async function replaceLogPhoto(
+  photoId: string,
+  photo: PhotoFile,
+  intake: IntakeDetails
+) {
   return sendPhoto(
     "/api/photos/" + encodeURIComponent(photoId),
     "PUT",
-    photo
+    photo,
+    intake
   );
 }
 
@@ -225,6 +242,8 @@ export async function deleteLogPhoto(photoId: string) {
     photoCount: number;
     latestPhotoId: string | null;
     status: "pending" | "received";
+    receivedAt: string | null;
+    vehiclePlate: string | null;
   }>("/api/photos/" + encodeURIComponent(photoId), { method: "DELETE" });
 }
 

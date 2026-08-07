@@ -66,11 +66,15 @@ CREATE TABLE IF NOT EXISTS wood_logs (
   row_data jsonb NOT NULL DEFAULT '{}'::jsonb,
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'received')),
+  vehicle_plate text,
   received_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (import_id, normalized_log_no)
 );
+
+ALTER TABLE wood_logs
+  ADD COLUMN IF NOT EXISTS vehicle_plate text;
 
 CREATE INDEX IF NOT EXISTS wood_logs_normalized_log_no_idx
   ON wood_logs (normalized_log_no);
@@ -86,10 +90,14 @@ CREATE TABLE IF NOT EXISTS wood_log_photos (
   original_filename text NOT NULL,
   byte_size integer NOT NULL,
   sha256 text NOT NULL,
+  vehicle_plate text,
   captured_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (log_id, sha256)
 );
+
+ALTER TABLE wood_log_photos
+  ADD COLUMN IF NOT EXISTS vehicle_plate text;
 
 CREATE INDEX IF NOT EXISTS wood_log_photos_log_id_idx
   ON wood_log_photos (log_id, created_at DESC);

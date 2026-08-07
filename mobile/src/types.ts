@@ -36,6 +36,7 @@ export type WoodLog = {
   volumeCbm: number | null;
   sourceRow: number | null;
   status: LogStatus;
+  vehiclePlate: string | null;
   receivedAt: string | null;
   photoCount: number;
   latestPhotoId: string | null;
@@ -77,12 +78,18 @@ export type PhotoFile = {
   mimeType: string;
 };
 
+export type IntakeDetails = {
+  vehiclePlate: string;
+  capturedAt: string;
+};
+
 export type WoodLogPhoto = {
   id: string;
   logId: string;
   mimeType: string;
   originalFilename: string;
   byteSize: number;
+  vehiclePlate: string | null;
   capturedAt: string;
   createdAt: string;
 };

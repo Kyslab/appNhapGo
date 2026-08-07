@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import {
   Camera,
+  CarFront,
+  Clock3,
   Images,
   Maximize2,
   Pencil,
@@ -23,6 +25,7 @@ import {
   StatusBadge
 } from "./components";
 import { PhotoImage } from "./PhotoImage";
+import { formatIntakeTime } from "./intake";
 import { colors } from "./theme";
 import type { WoodLog, WoodLogPhoto } from "./types";
 
@@ -62,6 +65,7 @@ export function LogPhotoManager({
   onCloseFullPhoto: () => void;
 }) {
   const currentPhotoId = selectedPhotoId ?? log?.latestPhotoId ?? null;
+  const currentPhoto = photos.find((photo) => photo.id === currentPhotoId);
 
   return (
     <>
@@ -140,6 +144,14 @@ export function LogPhotoManager({
                     value={formatMetric(log.volumeCbm, "CBM")}
                   />
                   <DetailMetric label="Ảnh" value={log.photoCount + " ảnh"} />
+                  <DetailMetric
+                    label="Biển số xe"
+                    value={log.vehiclePlate || "--"}
+                  />
+                  <DetailMetric
+                    label="Thời gian nhập"
+                    value={formatIntakeTime(log.receivedAt)}
+                  />
                 </View>
 
                 {loading ? (
@@ -189,6 +201,22 @@ export function LogPhotoManager({
                         );
                       })}
                     </ScrollView>
+                    {currentPhoto ? (
+                      <View style={styles.photoInfoBand}>
+                        <View style={styles.photoInfoRow}>
+                          <CarFront color={colors.primary} size={16} />
+                          <Text style={styles.photoInfoText} numberOfLines={1}>
+                            {currentPhoto.vehiclePlate || "Chưa có biển số"}
+                          </Text>
+                        </View>
+                        <View style={styles.photoInfoRow}>
+                          <Clock3 color={colors.blue} size={16} />
+                          <Text style={styles.photoInfoText} numberOfLines={1}>
+                            {formatIntakeTime(currentPhoto.capturedAt)}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -415,6 +443,27 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 4,
     backgroundColor: colors.background
+  },
+  photoInfoBand: {
+    gap: 7,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border
+  },
+  photoInfoRow: {
+    minHeight: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  photoInfoText: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0
   },
   actionRow: {
     flexDirection: "row",
