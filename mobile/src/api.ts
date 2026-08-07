@@ -33,24 +33,37 @@ export function apiHeaders(): Record<string, string> {
   return API_KEY ? { "x-api-key": API_KEY } : {};
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response;
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  networkRetries = 0
+): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetch(API_URL + path, {
+        ...init,
+        headers: {
+          ...apiHeaders(),
+          ...(init?.headers ?? {})
+        }
+      });
 
-  try {
-    response = await fetch(API_URL + path, {
-      ...init,
-      headers: {
-        ...apiHeaders(),
-        ...(init?.headers ?? {})
+      return parseResponse<T>(await response.text(), response.ok);
+    } catch (caught) {
+      if (caught instanceof ApiError) {
+        throw caught;
       }
-    });
-  } catch {
-    throw new ApiError(
-      "Không kết nối được máy chủ. Kiểm tra API URL và mạng Wi-Fi."
-    );
-  }
 
-  return parseResponse<T>(await response.text(), response.ok);
+      if (attempt < networkRetries) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+        continue;
+      }
+
+      throw new ApiError(
+        "Máy chủ tạm thời không phản hồi. Kiểm tra kết nối Internet rồi thử lại."
+      );
+    }
+  }
 }
 
 function parseResponse<T>(text: string, ok: boolean): T {
@@ -135,7 +148,7 @@ export async function importWorkbook(
     duplicateFile: boolean;
     message: string;
     import: WoodImport;
-  }>("/api/imports", { method: "POST", body: form });
+  }>("/api/imports", { method: "POST", body: form }, 2);
 }
 
 export async function searchLogs(logNo: string): Promise<WoodLog[]> {
