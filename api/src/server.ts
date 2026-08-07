@@ -360,6 +360,15 @@ async function handleWorkbookImport(request: Request, response: Response) {
     request.file.buffer,
     request.file.originalname
   );
+  const completedDetails = {
+    ...details,
+    woodSpecies: details.woodSpecies ?? parsed.inferredWoodSpecies,
+    totalQuantity: details.totalQuantity ?? parsed.logs.length,
+    quantityUnit: details.quantityUnit ?? ("logs" as const),
+    declaredVolumeCbm:
+      details.declaredVolumeCbm ??
+      (parsed.totalVolumeCbm > 0 ? parsed.totalVolumeCbm : null)
+  };
   const client = await pool.connect();
 
   try {
@@ -370,7 +379,26 @@ async function handleWorkbookImport(request: Request, response: Response) {
     );
 
     if (existing.rows[0]) {
-      const summary = await getImportSummary(client, existing.rows[0].id as string);
+      const existingId = existing.rows[0].id as string;
+      await client.query(
+        `
+          UPDATE wood_imports
+          SET
+            wood_species = COALESCE(wood_species, $2),
+            total_quantity = COALESCE(total_quantity, $3),
+            quantity_unit = COALESCE(quantity_unit, $4),
+            declared_volume_cbm = COALESCE(declared_volume_cbm, $5)
+          WHERE id = $1
+        `,
+        [
+          existingId,
+          completedDetails.woodSpecies,
+          completedDetails.totalQuantity,
+          completedDetails.quantityUnit,
+          completedDetails.declaredVolumeCbm
+        ]
+      );
+      const summary = await getImportSummary(client, existingId);
       await client.query("COMMIT");
       response.status(200).json({
         duplicateFile: true,
@@ -423,20 +451,20 @@ async function handleWorkbookImport(request: Request, response: Response) {
         parsed.logs.length,
         parsed.duplicateRows,
         parsed.totalVolumeCbm,
-        details.shipmentType,
-        details.ownerName,
-        details.contactPhone,
-        details.lotName,
-        details.vesselName,
-        details.woodSpecies,
-        details.container20Count,
-        details.container40Count,
-        details.containerPickupLocation,
-        details.woodPickupLocation,
-        details.intakeStartDate,
-        details.totalQuantity,
-        details.quantityUnit,
-        details.declaredVolumeCbm
+        completedDetails.shipmentType,
+        completedDetails.ownerName,
+        completedDetails.contactPhone,
+        completedDetails.lotName,
+        completedDetails.vesselName,
+        completedDetails.woodSpecies,
+        completedDetails.container20Count,
+        completedDetails.container40Count,
+        completedDetails.containerPickupLocation,
+        completedDetails.woodPickupLocation,
+        completedDetails.intakeStartDate,
+        completedDetails.totalQuantity,
+        completedDetails.quantityUnit,
+        completedDetails.declaredVolumeCbm
       ]
     );
     const importId = importResult.rows[0].id as string;

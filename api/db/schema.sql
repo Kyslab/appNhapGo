@@ -106,3 +106,27 @@ ALTER TABLE wood_log_photos
 
 CREATE INDEX IF NOT EXISTS wood_log_photos_log_id_idx
   ON wood_log_photos (log_id, created_at DESC);
+
+UPDATE wood_imports
+SET
+  total_quantity = COALESCE(total_quantity, imported_rows),
+  quantity_unit = COALESCE(quantity_unit, 'logs'),
+  declared_volume_cbm = COALESCE(
+    declared_volume_cbm,
+    NULLIF(total_volume_cbm, 0)
+  )
+WHERE imported_rows > 0;
+
+UPDATE wood_imports AS imports
+SET wood_species = cargo_summary.cargo
+FROM (
+  SELECT DISTINCT ON (import_id)
+    import_id,
+    cargo
+  FROM wood_logs
+  WHERE cargo IS NOT NULL AND btrim(cargo) <> ''
+  GROUP BY import_id, cargo
+  ORDER BY import_id, count(*) DESC, cargo
+) AS cargo_summary
+WHERE imports.id = cargo_summary.import_id
+  AND imports.wood_species IS NULL;

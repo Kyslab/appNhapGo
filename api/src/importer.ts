@@ -30,6 +30,7 @@ export type ParsedWorkbook = {
   totalRows: number;
   duplicateRows: number;
   totalVolumeCbm: number;
+  inferredWoodSpecies: string | null;
   logs: ImportedLog[];
 };
 
@@ -220,6 +221,25 @@ function extractListCode(originalFilename: string): string {
   return knownCode?.[0] ?? baseName;
 }
 
+function inferWoodSpecies(logs: ImportedLog[]): string | null {
+  const counts = new Map<string, number>();
+
+  for (const log of logs) {
+    const cargo = log.cargo?.trim();
+
+    if (cargo) {
+      counts.set(cargo, (counts.get(cargo) ?? 0) + 1);
+    }
+  }
+
+  return (
+    [...counts.entries()].sort(
+      ([leftCargo, leftCount], [rightCargo, rightCount]) =>
+        rightCount - leftCount || leftCargo.localeCompare(rightCargo, "vi")
+    )[0]?.[0] ?? null
+  );
+}
+
 export async function parseWorkbook(
   buffer: Buffer,
   originalFilename: string
@@ -336,6 +356,7 @@ export async function parseWorkbook(
     totalRows,
     duplicateRows,
     totalVolumeCbm: logs.reduce((sum, log) => sum + (log.volumeCbm ?? 0), 0),
+    inferredWoodSpecies: inferWoodSpecies(logs),
     logs
   };
 }

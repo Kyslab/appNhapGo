@@ -50,6 +50,7 @@ describe("parseWorkbook", () => {
     assert.equal(result.logs[0].lengthM, 13.5);
     assert.equal(result.logs[0].diameterCm, 64);
     assert.equal(result.logs[0].volumeCbm, 4.343);
+    assert.equal(result.inferredWoodSpecies, "Padouk Round logs");
     assert.ok(Math.abs(result.totalVolumeCbm - 7.181) < 0.000001);
   });
 
