@@ -61,7 +61,7 @@ export function IntakeInfoModal({
       visible={visible}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.backdrop}
       >
         <Pressable
@@ -127,11 +127,15 @@ const styles = StyleSheet.create({
   },
   sheet: {
     gap: 12,
+    marginBottom: Platform.OS === "android" ? 10 : 0,
+    marginHorizontal: Platform.OS === "android" ? 8 : 0,
     paddingHorizontal: 18,
     paddingTop: 16,
     paddingBottom: 24,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
+    borderBottomLeftRadius: Platform.OS === "android" ? 8 : 0,
+    borderBottomRightRadius: Platform.OS === "android" ? 8 : 0,
     backgroundColor: colors.surface
   },
   header: {
