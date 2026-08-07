@@ -113,42 +113,62 @@ export async function importWorkbook(
   asset: DocumentPickerAsset,
   details: ImportDetailsInput
 ) {
-  const form = new FormData();
-  form.append("shipmentType", details.shipmentType ?? "");
-  form.append("ownerName", details.ownerName);
-  form.append("contactPhone", details.contactPhone);
-  form.append("woodSpecies", details.woodSpecies);
-  form.append("intakeStartDate", details.intakeStartDate);
-  form.append("totalQuantity", details.totalQuantity);
-  form.append("quantityUnit", details.quantityUnit ?? "");
-  form.append("declaredVolumeCbm", details.declaredVolumeCbm);
+  const parameters: Record<string, string> = {
+    shipmentType: details.shipmentType ?? "",
+    ownerName: details.ownerName,
+    contactPhone: details.contactPhone,
+    woodSpecies: details.woodSpecies,
+    intakeStartDate: details.intakeStartDate,
+    totalQuantity: details.totalQuantity,
+    quantityUnit: details.quantityUnit ?? "",
+    declaredVolumeCbm: details.declaredVolumeCbm
+  };
 
   if (details.shipmentType === "container") {
-    form.append("lotName", details.lotName);
-    form.append("container20Count", details.container20Count);
-    form.append("container40Count", details.container40Count);
-    form.append("containerPickupLocation", details.containerPickupLocation);
+    parameters.lotName = details.lotName;
+    parameters.container20Count = details.container20Count;
+    parameters.container40Count = details.container40Count;
+    parameters.containerPickupLocation = details.containerPickupLocation;
   } else if (details.shipmentType === "loose") {
-    form.append("vesselName", details.vesselName);
-    form.append("woodPickupLocation", details.woodPickupLocation);
+    parameters.vesselName = details.vesselName;
+    parameters.woodPickupLocation = details.woodPickupLocation;
   }
 
-  form.append(
-    "file",
-    {
-      uri: asset.uri,
-      name: asset.name,
-      type:
-        asset.mimeType ??
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    } as unknown as Blob
-  );
+  const file = new File(asset.uri);
+  let result;
 
-  return request<{
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      result = await file.upload(API_URL + "/api/imports", {
+        fieldName: "file",
+        headers: apiHeaders(),
+        httpMethod: "POST",
+        mimeType:
+          asset.mimeType ??
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        parameters,
+        uploadType: UploadType.MULTIPART
+      });
+      break;
+    } catch (caught) {
+      console.error("Workbook upload failed before receiving a response", caught);
+
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+        continue;
+      }
+
+      throw new ApiError(
+        "Không đọc hoặc gửi được file Excel. Hãy chọn lại file rồi thử lại."
+      );
+    }
+  }
+
+  return parseResponse<{
     duplicateFile: boolean;
     message: string;
     import: WoodImport;
-  }>("/api/imports", { method: "POST", body: form }, 2);
+  }>(result.body, result.status >= 200 && result.status < 300);
 }
 
 export async function searchLogs(logNo: string): Promise<WoodLog[]> {
