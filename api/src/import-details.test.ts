@@ -30,21 +30,16 @@ describe("parseImportDetails", () => {
     assert.equal(details.declaredVolumeCbm, 361.955);
   });
 
-  it("rejects a loose shipment without a vessel name", () => {
-    assert.throws(
-      () =>
-        parseImportDetails({
-          shipmentType: "loose",
-          ownerName: "Chủ hàng B",
-          contactPhone: "0907654321",
-          woodSpecies: "Padouk",
-          woodPickupLocation: "Cảng Quy Nhơn",
-          intakeStartDate: "2026-08-03",
-          totalQuantity: "120",
-          quantityUnit: "logs"
-        }),
-      ImportDetailsError
-    );
+  it("accepts a loose shipment with optional details omitted", () => {
+    const details = parseImportDetails({ shipmentType: "loose" });
+
+    assert.equal(details.ownerName, null);
+    assert.equal(details.vesselName, null);
+    assert.equal(details.woodSpecies, null);
+    assert.equal(details.intakeStartDate, null);
+    assert.equal(details.totalQuantity, null);
+    assert.equal(details.quantityUnit, null);
+    assert.equal(details.declaredVolumeCbm, null);
   });
 
   it("normalizes valid container details", () => {
@@ -90,16 +85,12 @@ describe("parseImportDetails", () => {
     );
   });
 
-  it("rejects a container shipment without a container", () => {
-    assert.throws(
-      () =>
-        parseImportDetails({
-          shipmentType: "container",
-          container20Count: "0",
-          container40Count: "0"
-        }),
-      ImportDetailsError
-    );
+  it("accepts a container shipment without container counts", () => {
+    const details = parseImportDetails({ shipmentType: "container" });
+
+    assert.equal(details.container20Count, 0);
+    assert.equal(details.container40Count, 0);
+    assert.equal(details.lotName, null);
   });
 
   it("rejects an impossible intake date", () => {

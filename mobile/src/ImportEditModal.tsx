@@ -102,7 +102,7 @@ export function ImportEditModal({
                 />
               </FormSection>
 
-              <FormSection title="Chủ hàng">
+              <FormSection optional title="Chủ hàng">
                 <FormField
                   label="Tên chủ hàng"
                   onChangeText={(value) => update("ownerName", value)}
@@ -116,7 +116,7 @@ export function ImportEditModal({
                 />
               </FormSection>
 
-              <FormSection title="Thông tin lô hàng">
+              <FormSection optional title="Thông tin lô hàng">
                 {draft.shipmentType === "container" ? (
                   <>
                     <FormField
@@ -182,7 +182,7 @@ export function ImportEditModal({
                 )}
               </FormSection>
 
-              <FormSection title="Tổng hợp lô hàng">
+              <FormSection optional title="Tổng hợp lô hàng">
                 <FormField
                   label="Ngày bắt đầu nhập"
                   maxLength={10}
@@ -252,10 +252,21 @@ function importToDraft(item: WoodImport): ImportUpdateInput {
   };
 }
 
-function FormSection({ title, children }: { title: string; children: ReactNode }) {
+function FormSection({
+  title,
+  optional = false,
+  children
+}: {
+  title: string;
+  optional?: boolean;
+  children: ReactNode;
+}) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {optional ? <Text style={styles.optionalLabel}>Không bắt buộc</Text> : null}
+      </View>
       {children}
     </View>
   );
@@ -407,9 +418,23 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   sectionTitle: {
+    flex: 1,
+    minWidth: 0,
     color: colors.ink,
     fontSize: 13,
     fontWeight: "900",
+    letterSpacing: 0
+  },
+  sectionHeader: {
+    minHeight: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  optionalLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
     letterSpacing: 0
   },
   field: {

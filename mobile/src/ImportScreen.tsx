@@ -346,7 +346,7 @@ function ContainerForm({
     <>
       <OwnerSection details={details} onChange={onChange} />
 
-      <FormSection title="Thông tin lô hàng">
+      <FormSection optional title="Thông tin lô hàng">
         <FormField
           label="Tên lô hàng"
           onChangeText={(value) => onChange("lotName", value)}
@@ -408,7 +408,7 @@ function LooseForm({
     <>
       <OwnerSection details={details} onChange={onChange} />
 
-      <FormSection title="Thông tin lô hàng">
+      <FormSection optional title="Thông tin lô hàng">
         <FormField
           autoCapitalize="words"
           label="Tên tàu"
@@ -443,7 +443,7 @@ function OwnerSection({
   onChange: DetailChange;
 }) {
   return (
-    <FormSection title="Chủ hàng">
+    <FormSection optional title="Chủ hàng">
       <FormField
         autoCapitalize="words"
         label="Tên chủ hàng"
@@ -470,7 +470,7 @@ function ShipmentSummarySection({
   onChange: DetailChange;
 }) {
   return (
-    <FormSection title="Tổng hợp lô hàng">
+    <FormSection optional title="Tổng hợp lô hàng">
       <FormField
         autoCapitalize="none"
         label="Ngày bắt đầu nhập"
@@ -504,14 +504,19 @@ function ShipmentSummarySection({
 
 function FormSection({
   title,
+  optional = false,
   children
 }: {
   title: string;
+  optional?: boolean;
   children: ReactNode;
 }) {
   return (
     <View style={styles.formSection}>
-      <Text style={styles.formSectionTitle}>{title}</Text>
+      <View style={styles.formSectionHeader}>
+        <Text style={styles.formSectionTitle}>{title}</Text>
+        {optional ? <Text style={styles.optionalLabel}>Không bắt buộc</Text> : null}
+      </View>
       {children}
     </View>
   );
@@ -657,67 +662,39 @@ function ImportSummary({ item }: { item: WoodImport }) {
 }
 
 function validateDetails(details: ImportDetailsInput): string | null {
-  const required: [string, string][] = [
-    [details.ownerName, "tên chủ hàng"],
-    [details.contactPhone, "điện thoại liên hệ"],
-    [details.woodSpecies, "loại gỗ"],
-    [details.intakeStartDate, "ngày bắt đầu nhập"],
-    [details.totalQuantity, "tổng số lượng lô hàng"],
-    [details.declaredVolumeCbm, "tổng khối lượng CBM"]
-  ];
-
-  if (details.shipmentType === "container") {
-    required.splice(
-      2,
-      0,
-      [details.lotName, "tên lô hàng"],
-      [details.containerPickupLocation, "nơi lấy container"]
-    );
-  } else {
-    required.splice(
-      2,
-      0,
-      [details.vesselName, "tên tàu"],
-      [details.woodPickupLocation, "nơi lấy gỗ"]
-    );
-  }
-
-  const missing = required.find(([value]) => !value.trim());
-
-  if (missing) {
-    return "Vui lòng nhập " + missing[1] + ".";
-  }
-
   if (details.shipmentType === "container") {
     if (
-      !/^\d+$/.test(details.container20Count) ||
-      !/^\d+$/.test(details.container40Count)
+      (details.container20Count.trim() &&
+        !/^\d+$/.test(details.container20Count)) ||
+      (details.container40Count.trim() &&
+        !/^\d+$/.test(details.container40Count))
     ) {
       return "Số container phải là số nguyên từ 0 trở lên.";
     }
 
-    if (
-      Number(details.container20Count) + Number(details.container40Count) ===
-      0
-    ) {
-      return "Lô hàng phải có ít nhất 1 container.";
-    }
   }
 
-  if (!/^\d+$/.test(details.totalQuantity) || Number(details.totalQuantity) <= 0) {
+  if (
+    details.totalQuantity.trim() &&
+    (!/^\d+$/.test(details.totalQuantity) || Number(details.totalQuantity) <= 0)
+  ) {
     return "Tổng số lượng phải là số nguyên lớn hơn 0.";
   }
 
   const normalizedVolume = details.declaredVolumeCbm.replace(",", ".");
 
   if (
-    !/^\d+(?:\.\d+)?$/.test(normalizedVolume) ||
-    Number(normalizedVolume) <= 0
+    details.declaredVolumeCbm.trim() &&
+    (!/^\d+(?:\.\d+)?$/.test(normalizedVolume) ||
+      Number(normalizedVolume) <= 0)
   ) {
     return "Tổng khối lượng CBM phải là số lớn hơn 0.";
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(details.intakeStartDate)) {
+  if (
+    details.intakeStartDate.trim() &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(details.intakeStartDate)
+  ) {
     return "Ngày bắt đầu nhập phải có dạng YYYY-MM-DD.";
   }
 
@@ -799,9 +776,23 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border
   },
   formSectionTitle: {
+    flex: 1,
+    minWidth: 0,
     color: colors.ink,
     fontSize: 15,
     fontWeight: "800",
+    letterSpacing: 0
+  },
+  formSectionHeader: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  optionalLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
     letterSpacing: 0
   },
   fieldLabel: {

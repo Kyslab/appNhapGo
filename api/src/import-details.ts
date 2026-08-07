@@ -50,6 +50,25 @@ function requiredText(
   return value;
 }
 
+function optionalText(
+  body: Record<string, unknown>,
+  key: string,
+  label: string,
+  maxLength = 200
+): string | null {
+  const value = String(body[key] ?? "").trim();
+
+  if (!value) {
+    return null;
+  }
+
+  if (value.length > maxLength) {
+    throw new ImportDetailsError(label + " quá dài.");
+  }
+
+  return value;
+}
+
 function nonNegativeInteger(
   body: Record<string, unknown>,
   key: string,
@@ -65,12 +84,18 @@ function nonNegativeInteger(
   return value;
 }
 
-function positiveInteger(
+function optionalPositiveInteger(
   body: Record<string, unknown>,
   key: string,
   label: string
-): number {
-  const value = Number(String(body[key] ?? "").trim());
+): number | null {
+  const raw = String(body[key] ?? "").trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
 
   if (!Number.isInteger(value) || value <= 0) {
     throw new ImportDetailsError(label + " phải là số nguyên lớn hơn 0.");
@@ -79,23 +104,36 @@ function positiveInteger(
   return value;
 }
 
-function positiveDecimal(
+function optionalPositiveDecimal(
   body: Record<string, unknown>,
   key: string,
   label: string
-): number {
+): number | null {
   const raw = String(body[key] ?? "").trim().replace(",", ".");
+
+  if (!raw) {
+    return null;
+  }
+
   const value = Number(raw);
 
-  if (!raw || !Number.isFinite(value) || value <= 0) {
+  if (!Number.isFinite(value) || value <= 0) {
     throw new ImportDetailsError(label + " phải là số lớn hơn 0.");
   }
 
   return value;
 }
 
-function validDate(body: Record<string, unknown>, key: string): string {
-  const value = requiredText(body, key, "ngày bắt đầu nhập", 10);
+function optionalValidDate(
+  body: Record<string, unknown>,
+  key: string
+): string | null {
+  const value = optionalText(body, key, "Ngày bắt đầu nhập", 10);
+
+  if (!value) {
+    return null;
+  }
+
   const parts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
   if (!parts) {
@@ -128,30 +166,36 @@ export function parseImportDetails(value: unknown): ImportDetails {
     );
   }
 
-  const ownerName = requiredText(body, "ownerName", "tên chủ hàng");
-  const contactPhone = requiredText(
+  const ownerName = optionalText(body, "ownerName", "Tên chủ hàng");
+  const contactPhone = optionalText(
     body,
     "contactPhone",
-    "điện thoại liên hệ",
+    "Điện thoại liên hệ",
     30
   );
-  const woodSpecies = requiredText(body, "woodSpecies", "loại gỗ");
-  const intakeStartDate = validDate(body, "intakeStartDate");
-  const totalQuantity = positiveInteger(
+  const woodSpecies = optionalText(body, "woodSpecies", "Loại gỗ");
+  const intakeStartDate = optionalValidDate(body, "intakeStartDate");
+  const totalQuantity = optionalPositiveInteger(
     body,
     "totalQuantity",
     "Tổng số lượng"
   );
-  const declaredVolumeCbm = positiveDecimal(
+  const declaredVolumeCbm = optionalPositiveDecimal(
     body,
     "declaredVolumeCbm",
     "Tổng khối lượng CBM"
   );
-  const quantityUnit = String(body.quantityUnit ?? "").trim();
+  const quantityUnitValue = String(body.quantityUnit ?? "").trim();
 
-  if (!new Set(["logs", "packages", "boxes"]).has(quantityUnit)) {
+  if (
+    quantityUnitValue &&
+    !new Set(["logs", "packages", "boxes"]).has(quantityUnitValue)
+  ) {
     throw new ImportDetailsError("Vui lòng chọn đơn vị lóng, kiện hoặc hộp.");
   }
+  const quantityUnit = quantityUnitValue
+    ? (quantityUnitValue as QuantityUnit)
+    : null;
 
   if (shipmentType === "loose") {
     return {
@@ -159,19 +203,19 @@ export function parseImportDetails(value: unknown): ImportDetails {
       ownerName,
       contactPhone,
       lotName: null,
-      vesselName: requiredText(body, "vesselName", "tên tàu"),
+      vesselName: optionalText(body, "vesselName", "Tên tàu"),
       woodSpecies,
       container20Count: 0,
       container40Count: 0,
       containerPickupLocation: null,
-      woodPickupLocation: requiredText(
+      woodPickupLocation: optionalText(
         body,
         "woodPickupLocation",
-        "nơi lấy gỗ"
+        "Nơi lấy gỗ"
       ),
       intakeStartDate,
       totalQuantity,
-      quantityUnit: quantityUnit as QuantityUnit,
+      quantityUnit,
       declaredVolumeCbm
     };
   }
@@ -187,28 +231,24 @@ export function parseImportDetails(value: unknown): ImportDetails {
     "Số Cont 40'"
   );
 
-  if (container20Count + container40Count === 0) {
-    throw new ImportDetailsError("Lô hàng phải có ít nhất 1 container.");
-  }
-
   return {
     shipmentType,
     ownerName,
     contactPhone,
-    lotName: requiredText(body, "lotName", "tên lô hàng"),
+    lotName: optionalText(body, "lotName", "Tên lô hàng"),
     vesselName: null,
     woodSpecies,
     container20Count,
     container40Count,
-    containerPickupLocation: requiredText(
+    containerPickupLocation: optionalText(
       body,
       "containerPickupLocation",
-      "nơi lấy container"
+      "Nơi lấy container"
     ),
     woodPickupLocation: null,
     intakeStartDate,
     totalQuantity,
-    quantityUnit: quantityUnit as QuantityUnit,
+    quantityUnit,
     declaredVolumeCbm
   };
 }
