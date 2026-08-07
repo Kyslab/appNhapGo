@@ -101,13 +101,13 @@ export async function importWorkbook(
   details: ImportDetailsInput
 ) {
   const form = new FormData();
-  form.append("shipmentType", details.shipmentType);
+  form.append("shipmentType", details.shipmentType ?? "");
   form.append("ownerName", details.ownerName);
   form.append("contactPhone", details.contactPhone);
   form.append("woodSpecies", details.woodSpecies);
   form.append("intakeStartDate", details.intakeStartDate);
   form.append("totalQuantity", details.totalQuantity);
-  form.append("quantityUnit", details.quantityUnit);
+  form.append("quantityUnit", details.quantityUnit ?? "");
   form.append("declaredVolumeCbm", details.declaredVolumeCbm);
 
   if (details.shipmentType === "container") {
@@ -115,7 +115,7 @@ export async function importWorkbook(
     form.append("container20Count", details.container20Count);
     form.append("container40Count", details.container40Count);
     form.append("containerPickupLocation", details.containerPickupLocation);
-  } else {
+  } else if (details.shipmentType === "loose") {
     form.append("vesselName", details.vesselName);
     form.append("woodPickupLocation", details.woodPickupLocation);
   }

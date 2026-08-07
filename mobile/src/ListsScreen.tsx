@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Container,
+  FileQuestion,
   PackageOpen,
   Pencil,
   Search,
@@ -865,7 +866,11 @@ function ImportRow({
   const progress =
     item.totalLogs === 0 ? 0 : item.receivedLogs / item.totalLogs;
   const ShipmentIcon =
-    item.shipmentType === "container" ? Container : PackageOpen;
+    item.shipmentType === "container"
+      ? Container
+      : item.shipmentType === "loose"
+        ? PackageOpen
+        : FileQuestion;
   const displayName = importDisplayName(item);
 
   return (
@@ -889,11 +894,11 @@ function ImportRow({
             {item.shipmentType === "container"
               ? item.listCode +
                 " · " +
-                item.container20Count +
+                (item.container20Count ?? "--") +
                 " Cont 20' · " +
-                item.container40Count +
+                (item.container40Count ?? "--") +
                 " Cont 40'"
-              : item.listCode + " · Hàng rời"}
+              : item.listCode + " · " + shipmentTypeLabel(item.shipmentType)}
           </Text>
           <Text style={styles.importMeta} numberOfLines={1}>
             {(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
@@ -903,7 +908,9 @@ function ImportRow({
               " · Nơi lấy: " +
               (item.shipmentType === "container"
                 ? item.containerPickupLocation || "--"
-                : item.woodPickupLocation || "--")}
+                : item.shipmentType === "loose"
+                  ? item.woodPickupLocation || "--"
+                  : "--")}
           </Text>
           <Text style={styles.importMeta} numberOfLines={1}>
             {formatImportDate(item.intakeStartDate) +
@@ -941,7 +948,30 @@ function ImportRow({
 }
 
 function ShipmentInformation({ item }: { item: WoodImport }) {
-  if (item.shipmentType !== "container") {
+  if (item.shipmentType === null) {
+    return (
+      <View style={styles.shipmentBand}>
+        <Text style={styles.shipmentHeading}>Thông tin lô hàng</Text>
+        <ShipmentRow label="Hình thức" value="Chưa phân loại" />
+        <ShipmentRow
+          label="Chủ hàng"
+          value={(item.ownerName || "--") + " · " + (item.contactPhone || "--")}
+        />
+        <ShipmentRow label="Gỗ" value={item.woodSpecies || "--"} />
+        <ShipmentRow
+          label="Ngày bắt đầu"
+          value={formatImportDate(item.intakeStartDate)}
+        />
+        <ShipmentRow label="Tổng lô" value={formatImportQuantity(item)} />
+        <ShipmentRow
+          label="Khối lượng"
+          value={formatDeclaredVolume(item)}
+        />
+      </View>
+    );
+  }
+
+  if (item.shipmentType === "loose") {
     return (
       <View style={styles.shipmentBand}>
         <Text style={styles.shipmentHeading}>Thông tin lô hàng</Text>
@@ -983,9 +1013,9 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
       <ShipmentRow
         label="Container"
         value={
-          item.container20Count +
+          (item.container20Count ?? "--") +
           " Cont 20' · " +
-          item.container40Count +
+          (item.container40Count ?? "--") +
           " Cont 40'"
         }
       />
@@ -1010,9 +1040,21 @@ function ShipmentInformation({ item }: { item: WoodImport }) {
 }
 
 function importDisplayName(item: WoodImport): string {
-  return item.shipmentType === "container"
-    ? item.lotName || item.listCode
-    : item.vesselName || item.listCode;
+  if (item.shipmentType === "container") {
+    return item.lotName || item.listCode;
+  }
+
+  return item.shipmentType === "loose"
+    ? item.vesselName || item.listCode
+    : item.listCode;
+}
+
+function shipmentTypeLabel(value: WoodImport["shipmentType"]): string {
+  return value === "container"
+    ? "Container"
+    : value === "loose"
+      ? "Hàng rời"
+      : "Chưa phân loại";
 }
 
 function ShipmentRow({ label, value }: { label: string; value: string }) {

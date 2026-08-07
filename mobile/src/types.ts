@@ -3,7 +3,7 @@ export type ShipmentType = "container" | "loose";
 export type QuantityUnit = "logs" | "packages" | "boxes";
 
 export type ImportDetailsInput = {
-  shipmentType: ShipmentType;
+  shipmentType: ShipmentType | null;
   ownerName: string;
   contactPhone: string;
   lotName: string;
@@ -15,7 +15,7 @@ export type ImportDetailsInput = {
   woodPickupLocation: string;
   intakeStartDate: string;
   totalQuantity: string;
-  quantityUnit: QuantityUnit;
+  quantityUnit: QuantityUnit | null;
   declaredVolumeCbm: string;
 };
 
@@ -52,14 +52,14 @@ export type WoodImport = {
   importedRows: number;
   duplicateRows: number;
   totalVolumeCbm: number;
-  shipmentType: ShipmentType;
+  shipmentType: ShipmentType | null;
   ownerName: string | null;
   contactPhone: string | null;
   lotName: string | null;
   vesselName: string | null;
   woodSpecies: string | null;
-  container20Count: number;
-  container40Count: number;
+  container20Count: number | null;
+  container40Count: number | null;
   containerPickupLocation: string | null;
   woodPickupLocation: string | null;
   intakeStartDate: string | null;

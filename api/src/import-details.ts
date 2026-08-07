@@ -2,14 +2,14 @@ export type ShipmentType = "container" | "loose";
 export type QuantityUnit = "logs" | "packages" | "boxes";
 
 export type ImportDetails = {
-  shipmentType: ShipmentType;
+  shipmentType: ShipmentType | null;
   ownerName: string | null;
   contactPhone: string | null;
   lotName: string | null;
   vesselName: string | null;
   woodSpecies: string | null;
-  container20Count: number;
-  container40Count: number;
+  container20Count: number | null;
+  container40Count: number | null;
   containerPickupLocation: string | null;
   woodPickupLocation: string | null;
   intakeStartDate: string | null;
@@ -69,13 +69,18 @@ function optionalText(
   return value;
 }
 
-function nonNegativeInteger(
+function optionalNonNegativeInteger(
   body: Record<string, unknown>,
   key: string,
   label: string
-): number {
+): number | null {
   const raw = String(body[key] ?? "").trim();
-  const value = Number(raw || "0");
+
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
 
   if (!Number.isInteger(value) || value < 0) {
     throw new ImportDetailsError(label + " phải là số nguyên từ 0 trở lên.");
@@ -158,13 +163,20 @@ function optionalValidDate(
 
 export function parseImportDetails(value: unknown): ImportDetails {
   const body = bodyRecord(value);
-  const shipmentType = String(body.shipmentType ?? "").trim();
+  const shipmentTypeValue = String(body.shipmentType ?? "").trim();
 
-  if (shipmentType !== "container" && shipmentType !== "loose") {
+  if (
+    shipmentTypeValue &&
+    shipmentTypeValue !== "container" &&
+    shipmentTypeValue !== "loose"
+  ) {
     throw new ImportDetailsError(
-      "Vui lòng chọn nhập hàng Container hoặc nhập hàng rời."
+      "Hình thức nhập hàng không hợp lệ."
     );
   }
+  const shipmentType = shipmentTypeValue
+    ? (shipmentTypeValue as ShipmentType)
+    : null;
 
   const ownerName = optionalText(body, "ownerName", "Tên chủ hàng");
   const contactPhone = optionalText(
@@ -205,8 +217,8 @@ export function parseImportDetails(value: unknown): ImportDetails {
       lotName: null,
       vesselName: optionalText(body, "vesselName", "Tên tàu"),
       woodSpecies,
-      container20Count: 0,
-      container40Count: 0,
+      container20Count: null,
+      container40Count: null,
       containerPickupLocation: null,
       woodPickupLocation: optionalText(
         body,
@@ -220,12 +232,47 @@ export function parseImportDetails(value: unknown): ImportDetails {
     };
   }
 
-  const container20Count = nonNegativeInteger(
+  if (shipmentType === null) {
+    return {
+      shipmentType,
+      ownerName,
+      contactPhone,
+      lotName: optionalText(body, "lotName", "Tên lô hàng"),
+      vesselName: optionalText(body, "vesselName", "Tên tàu"),
+      woodSpecies,
+      container20Count: optionalNonNegativeInteger(
+        body,
+        "container20Count",
+        "Số Cont 20'"
+      ),
+      container40Count: optionalNonNegativeInteger(
+        body,
+        "container40Count",
+        "Số Cont 40'"
+      ),
+      containerPickupLocation: optionalText(
+        body,
+        "containerPickupLocation",
+        "Nơi lấy container"
+      ),
+      woodPickupLocation: optionalText(
+        body,
+        "woodPickupLocation",
+        "Nơi lấy gỗ"
+      ),
+      intakeStartDate,
+      totalQuantity,
+      quantityUnit,
+      declaredVolumeCbm
+    };
+  }
+
+  const container20Count = optionalNonNegativeInteger(
     body,
     "container20Count",
     "Số Cont 20'"
   );
-  const container40Count = nonNegativeInteger(
+  const container40Count = optionalNonNegativeInteger(
     body,
     "container40Count",
     "Số Cont 40'"

@@ -25,7 +25,7 @@ describe("parseImportDetails", () => {
     assert.equal(details.ownerName, "Chủ hàng B");
     assert.equal(details.vesselName, "Tàu Đại Dương");
     assert.equal(details.woodPickupLocation, "Cảng Quy Nhơn");
-    assert.equal(details.container20Count, 0);
+    assert.equal(details.container20Count, null);
     assert.equal(details.totalQuantity, 120);
     assert.equal(details.declaredVolumeCbm, 361.955);
   });
@@ -40,6 +40,20 @@ describe("parseImportDetails", () => {
     assert.equal(details.totalQuantity, null);
     assert.equal(details.quantityUnit, null);
     assert.equal(details.declaredVolumeCbm, null);
+  });
+
+  it("accepts all shipment details omitted", () => {
+    const details = parseImportDetails({});
+
+    assert.equal(details.shipmentType, null);
+    assert.equal(details.ownerName, null);
+    assert.equal(details.woodSpecies, null);
+    assert.equal(details.intakeStartDate, null);
+    assert.equal(details.totalQuantity, null);
+    assert.equal(details.quantityUnit, null);
+    assert.equal(details.declaredVolumeCbm, null);
+    assert.equal(details.container20Count, null);
+    assert.equal(details.container40Count, null);
   });
 
   it("normalizes valid container details", () => {
@@ -88,8 +102,8 @@ describe("parseImportDetails", () => {
   it("accepts a container shipment without container counts", () => {
     const details = parseImportDetails({ shipmentType: "container" });
 
-    assert.equal(details.container20Count, 0);
-    assert.equal(details.container40Count, 0);
+    assert.equal(details.container20Count, null);
+    assert.equal(details.container40Count, null);
     assert.equal(details.lotName, null);
   });
 

@@ -408,9 +408,13 @@ function ImportFilterCard({
 }
 
 function importDisplayName(item: WoodImport): string {
-  return item.shipmentType === "container"
-    ? item.lotName || item.listCode
-    : item.vesselName || item.listCode;
+  if (item.shipmentType === "container") {
+    return item.lotName || item.listCode;
+  }
+
+  return item.shipmentType === "loose"
+    ? item.vesselName || item.listCode
+    : item.listCode;
 }
 
 function WarehouseRow({

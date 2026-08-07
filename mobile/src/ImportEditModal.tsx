@@ -11,7 +11,12 @@ import {
   View,
   type TextInputProps
 } from "react-native";
-import { Container, PackageOpen, Save, X } from "lucide-react-native";
+import {
+  Container,
+  PackageOpen,
+  Save,
+  X
+} from "lucide-react-native";
 import { ActionButton, IconButton, Notice } from "./components";
 import { colors } from "./theme";
 import type {
@@ -95,7 +100,7 @@ export function ImportEditModal({
                 />
               </FormSection>
 
-              <FormSection title="Hình thức nhập hàng">
+              <FormSection optional title="Hình thức nhập hàng">
                 <ShipmentSelector
                   onChange={(value) => update("shipmentType", value)}
                   value={draft.shipmentType}
@@ -159,7 +164,7 @@ export function ImportEditModal({
                       value={draft.containerPickupLocation}
                     />
                   </>
-                ) : (
+                ) : draft.shipmentType === "loose" ? (
                   <>
                     <FormField
                       label="Tên tàu"
@@ -179,6 +184,12 @@ export function ImportEditModal({
                       value={draft.woodPickupLocation}
                     />
                   </>
+                ) : (
+                  <FormField
+                    label="Loại gỗ"
+                    onChangeText={(value) => update("woodSpecies", value)}
+                    value={draft.woodSpecies}
+                  />
                 )}
               </FormSection>
 
@@ -240,13 +251,15 @@ function importToDraft(item: WoodImport): ImportUpdateInput {
     lotName: item.lotName ?? "",
     vesselName: item.vesselName ?? "",
     woodSpecies: item.woodSpecies ?? "",
-    container20Count: String(item.container20Count),
-    container40Count: String(item.container40Count),
+    container20Count:
+      item.container20Count === null ? "" : String(item.container20Count),
+    container40Count:
+      item.container40Count === null ? "" : String(item.container40Count),
     containerPickupLocation: item.containerPickupLocation ?? "",
     woodPickupLocation: item.woodPickupLocation ?? "",
     intakeStartDate: item.intakeStartDate?.slice(0, 10) ?? "",
     totalQuantity: item.totalQuantity === null ? "" : String(item.totalQuantity),
-    quantityUnit: item.quantityUnit ?? "logs",
+    quantityUnit: item.quantityUnit,
     declaredVolumeCbm:
       item.declaredVolumeCbm === null ? "" : String(item.declaredVolumeCbm)
   };
@@ -291,8 +304,8 @@ function ShipmentSelector({
   value,
   onChange
 }: {
-  value: ShipmentType;
-  onChange: (value: ShipmentType) => void;
+  value: ShipmentType | null;
+  onChange: (value: ShipmentType | null) => void;
 }) {
   const options = [
     { value: "container" as const, label: "Container", icon: Container },
@@ -321,6 +334,13 @@ function ShipmentSelector({
           </Pressable>
         );
       })}
+      {value ? (
+        <IconButton
+          icon={X}
+          label="Bỏ chọn hình thức nhập hàng"
+          onPress={() => onChange(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -329,8 +349,8 @@ function QuantitySelector({
   value,
   onChange
 }: {
-  value: QuantityUnit;
-  onChange: (value: QuantityUnit) => void;
+  value: QuantityUnit | null;
+  onChange: (value: QuantityUnit | null) => void;
 }) {
   const options: { value: QuantityUnit; label: string }[] = [
     { value: "logs", label: "Lóng" },
@@ -358,6 +378,13 @@ function QuantitySelector({
           </Pressable>
         );
       })}
+      {value ? (
+        <IconButton
+          icon={X}
+          label="Bỏ chọn đơn vị"
+          onPress={() => onChange(null)}
+        />
+      ) : null}
     </View>
   );
 }

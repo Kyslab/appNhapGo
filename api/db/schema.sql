@@ -11,17 +11,14 @@ CREATE TABLE IF NOT EXISTS wood_imports (
   imported_rows integer NOT NULL DEFAULT 0,
   duplicate_rows integer NOT NULL DEFAULT 0,
   total_volume_cbm numeric(16, 6) NOT NULL DEFAULT 0,
-  shipment_type text NOT NULL DEFAULT 'loose'
-    CHECK (shipment_type IN ('container', 'loose')),
+  shipment_type text CHECK (shipment_type IN ('container', 'loose')),
   owner_name text,
   contact_phone text,
   lot_name text,
   vessel_name text,
   wood_species text,
-  container_20_count integer NOT NULL DEFAULT 0
-    CHECK (container_20_count >= 0),
-  container_40_count integer NOT NULL DEFAULT 0
-    CHECK (container_40_count >= 0),
+  container_20_count integer CHECK (container_20_count >= 0),
+  container_40_count integer CHECK (container_40_count >= 0),
   container_pickup_location text,
   wood_pickup_location text,
   intake_start_date date,
@@ -32,16 +29,16 @@ CREATE TABLE IF NOT EXISTS wood_imports (
 );
 
 ALTER TABLE wood_imports
-  ADD COLUMN IF NOT EXISTS shipment_type text NOT NULL DEFAULT 'loose'
+  ADD COLUMN IF NOT EXISTS shipment_type text
     CHECK (shipment_type IN ('container', 'loose')),
   ADD COLUMN IF NOT EXISTS owner_name text,
   ADD COLUMN IF NOT EXISTS contact_phone text,
   ADD COLUMN IF NOT EXISTS lot_name text,
   ADD COLUMN IF NOT EXISTS vessel_name text,
   ADD COLUMN IF NOT EXISTS wood_species text,
-  ADD COLUMN IF NOT EXISTS container_20_count integer NOT NULL DEFAULT 0
+  ADD COLUMN IF NOT EXISTS container_20_count integer
     CHECK (container_20_count >= 0),
-  ADD COLUMN IF NOT EXISTS container_40_count integer NOT NULL DEFAULT 0
+  ADD COLUMN IF NOT EXISTS container_40_count integer
     CHECK (container_40_count >= 0),
   ADD COLUMN IF NOT EXISTS container_pickup_location text,
   ADD COLUMN IF NOT EXISTS wood_pickup_location text,
@@ -51,6 +48,14 @@ ALTER TABLE wood_imports
     CHECK (quantity_unit IN ('logs', 'packages', 'boxes')),
   ADD COLUMN IF NOT EXISTS declared_volume_cbm numeric(16, 3)
     CHECK (declared_volume_cbm > 0);
+
+ALTER TABLE wood_imports
+  ALTER COLUMN shipment_type DROP NOT NULL,
+  ALTER COLUMN shipment_type DROP DEFAULT,
+  ALTER COLUMN container_20_count DROP NOT NULL,
+  ALTER COLUMN container_20_count DROP DEFAULT,
+  ALTER COLUMN container_40_count DROP NOT NULL,
+  ALTER COLUMN container_40_count DROP DEFAULT;
 
 CREATE TABLE IF NOT EXISTS wood_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

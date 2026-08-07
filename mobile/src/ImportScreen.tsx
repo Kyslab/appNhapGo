@@ -39,27 +39,21 @@ import type {
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-function localDate(): string {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-
 function emptyDetails(): ImportDetailsInput {
   return {
-    shipmentType: "container",
+    shipmentType: null,
     ownerName: "",
     contactPhone: "",
     lotName: "",
     vesselName: "",
     woodSpecies: "",
-    container20Count: "0",
-    container40Count: "0",
+    container20Count: "",
+    container40Count: "",
     containerPickupLocation: "",
     woodPickupLocation: "",
-    intakeStartDate: localDate(),
+    intakeStartDate: "",
     totalQuantity: "",
-    quantityUnit: "logs",
+    quantityUnit: null,
     declaredVolumeCbm: ""
   };
 }
@@ -98,7 +92,7 @@ export function ImportScreen({ onImported }: { onImported: () => void }) {
     }
   }
 
-  function selectShipmentType(value: ShipmentType) {
+  function selectShipmentType(value: ShipmentType | null) {
     setShipmentType(value);
     setDetails((current) => ({ ...current, shipmentType: value }));
     setError(null);
@@ -124,22 +118,10 @@ export function ImportScreen({ onImported }: { onImported: () => void }) {
     if (!result.canceled && result.assets[0]) {
       const nextAsset = result.assets[0];
       setAsset(nextAsset);
-      setDetails((current) => ({
-        ...current,
-        lotName:
-          shipmentType === "container" && !current.lotName.trim()
-            ? nextAsset.name.replace(/\.xlsx$/i, "")
-            : current.lotName
-      }));
     }
   }
 
   async function uploadWorkbook() {
-    if (!shipmentType) {
-      setError("Vui lòng chọn hình thức nhập hàng.");
-      return;
-    }
-
     if (!asset) {
       setError("Vui lòng chọn file Excel .xlsx.");
       return;
@@ -193,72 +175,68 @@ export function ImportScreen({ onImported }: { onImported: () => void }) {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={screenText.title}>Nhập danh sách</Text>
-          <Text style={screenText.label}>Hình thức nhập hàng</Text>
-          <ShipmentTypeSelector
-            onChange={selectShipmentType}
-            value={shipmentType}
-          />
+          <FormSection optional title="Hình thức nhập hàng">
+            <ShipmentTypeSelector
+              onChange={selectShipmentType}
+              value={shipmentType}
+            />
+          </FormSection>
 
-          {shipmentType ? (
-            <>
-              <FormSection title="File Excel (.xlsx)">
-                {asset ? (
-                  <View style={styles.fileCard}>
-                    <View style={styles.fileIcon}>
-                      <FileSpreadsheet color={colors.primary} size={25} />
-                    </View>
-                    <View style={styles.fileInfo}>
-                      <Text style={styles.fileName} numberOfLines={2}>
-                        {asset.name}
-                      </Text>
-                      <Text style={styles.fileSize}>
-                        {formatBytes(asset.size ?? 0)}
-                      </Text>
-                    </View>
-                    <IconButton
-                      icon={X}
-                      label="Bỏ file đã chọn"
-                      onPress={() => setAsset(null)}
-                    />
-                  </View>
-                ) : (
-                  <ActionButton
-                    icon={FileSpreadsheet}
-                    label="Chọn file Excel"
-                    onPress={pickWorkbook}
-                    variant="secondary"
-                  />
-                )}
-              </FormSection>
-
-              {shipmentType === "container" ? (
-                <ContainerForm
-                  details={details}
-                  onChange={updateDetail}
-                />
-              ) : (
-                <LooseForm details={details} onChange={updateDetail} />
-              )}
-
-              {asset ? (
-                <View style={styles.actionRow}>
-                  <ActionButton
-                    icon={RefreshCw}
-                    label="Chọn lại"
-                    onPress={pickWorkbook}
-                    style={styles.rowButton}
-                    variant="secondary"
-                  />
-                  <ActionButton
-                    busy={loading}
-                    icon={Upload}
-                    label="Nhập dữ liệu"
-                    onPress={uploadWorkbook}
-                    style={styles.rowButton}
-                  />
+          <FormSection title="File Excel (.xlsx)">
+            {asset ? (
+              <View style={styles.fileCard}>
+                <View style={styles.fileIcon}>
+                  <FileSpreadsheet color={colors.primary} size={25} />
                 </View>
-              ) : null}
-            </>
+                <View style={styles.fileInfo}>
+                  <Text style={styles.fileName} numberOfLines={2}>
+                    {asset.name}
+                  </Text>
+                  <Text style={styles.fileSize}>
+                    {formatBytes(asset.size ?? 0)}
+                  </Text>
+                </View>
+                <IconButton
+                  icon={X}
+                  label="Bỏ file đã chọn"
+                  onPress={() => setAsset(null)}
+                />
+              </View>
+            ) : (
+              <ActionButton
+                icon={FileSpreadsheet}
+                label="Chọn file Excel"
+                onPress={pickWorkbook}
+                variant="secondary"
+              />
+            )}
+          </FormSection>
+
+          {shipmentType === "container" ? (
+            <ContainerForm details={details} onChange={updateDetail} />
+          ) : shipmentType === "loose" ? (
+            <LooseForm details={details} onChange={updateDetail} />
+          ) : (
+            <UnclassifiedForm details={details} onChange={updateDetail} />
+          )}
+
+          {asset ? (
+            <View style={styles.actionRow}>
+              <ActionButton
+                icon={RefreshCw}
+                label="Chọn lại"
+                onPress={pickWorkbook}
+                style={styles.rowButton}
+                variant="secondary"
+              />
+              <ActionButton
+                busy={loading}
+                icon={Upload}
+                label="Nhập dữ liệu"
+                onPress={uploadWorkbook}
+                style={styles.rowButton}
+              />
+            </View>
           ) : null}
 
           {error ? (
@@ -290,7 +268,7 @@ function ShipmentTypeSelector({
   onChange
 }: {
   value: ShipmentType | null;
-  onChange: (value: ShipmentType) => void;
+  onChange: (value: ShipmentType | null) => void;
 }) {
   const options = [
     { value: "container" as const, label: "Hàng Container", icon: Container },
@@ -328,7 +306,37 @@ function ShipmentTypeSelector({
           </Pressable>
         );
       })}
+      {value ? (
+        <IconButton
+          icon={X}
+          label="Bỏ chọn hình thức nhập hàng"
+          onPress={() => onChange(null)}
+        />
+      ) : null}
     </View>
+  );
+}
+
+function UnclassifiedForm({
+  details,
+  onChange
+}: {
+  details: ImportDetailsInput;
+  onChange: DetailChange;
+}) {
+  return (
+    <>
+      <OwnerSection details={details} onChange={onChange} />
+      <FormSection optional title="Thông tin lô hàng">
+        <FormField
+          label="Gỗ"
+          onChangeText={(value) => onChange("woodSpecies", value)}
+          placeholder="Padouk"
+          value={details.woodSpecies}
+        />
+      </FormSection>
+      <ShipmentSummarySection details={details} onChange={onChange} />
+    </>
   );
 }
 
@@ -548,8 +556,8 @@ function QuantityUnitSelector({
   value,
   onChange
 }: {
-  value: QuantityUnit;
-  onChange: (value: QuantityUnit) => void;
+  value: QuantityUnit | null;
+  onChange: (value: QuantityUnit | null) => void;
 }) {
   const options: { value: QuantityUnit; label: string }[] = [
     { value: "logs", label: "Lóng" },
@@ -577,6 +585,13 @@ function QuantityUnitSelector({
           </Pressable>
         );
       })}
+      {value ? (
+        <IconButton
+          icon={X}
+          label="Bỏ chọn đơn vị"
+          onPress={() => onChange(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -603,11 +618,13 @@ function ImportSummary({ item }: { item: WoodImport }) {
             styles.modeBadge,
             item.shipmentType === "container"
               ? styles.containerBadge
-              : styles.looseBadge
+              : item.shipmentType === "loose"
+                ? styles.looseBadge
+                : styles.unspecifiedBadge
           ]}
         >
           <Text style={styles.modeBadgeText}>
-            {item.shipmentType === "container" ? "Container" : "Hàng rời"}
+            {shipmentTypeLabel(item.shipmentType)}
           </Text>
         </View>
       </View>
@@ -615,15 +632,19 @@ function ImportSummary({ item }: { item: WoodImport }) {
         {item.shipmentType === "container"
           ? (item.ownerName || "--") +
             " · " +
-            item.container20Count +
+            (item.container20Count ?? "--") +
             " Cont 20' · " +
-            item.container40Count +
+            (item.container40Count ?? "--") +
             " Cont 40'"
-          : (item.ownerName || "--") +
-            " · Tàu " +
-            (item.vesselName || "--") +
-            " · " +
-            (item.woodSpecies || "--")}
+          : item.shipmentType === "loose"
+            ? (item.ownerName || "--") +
+              " · Tàu " +
+              (item.vesselName || "--") +
+              " · " +
+              (item.woodSpecies || "--")
+            : (item.ownerName || "Chưa có thông tin chủ hàng") +
+              " · " +
+              (item.woodSpecies || "Chưa có loại gỗ")}
       </Text>
       <View style={styles.progressTrack}>
         <View
@@ -702,9 +723,21 @@ function validateDetails(details: ImportDetailsInput): string | null {
 }
 
 function importDisplayName(item: WoodImport): string {
-  return item.shipmentType === "container"
-    ? item.lotName || item.listCode
-    : item.vesselName || item.listCode;
+  if (item.shipmentType === "container") {
+    return item.lotName || item.listCode;
+  }
+
+  return item.shipmentType === "loose"
+    ? item.vesselName || item.listCode
+    : item.listCode;
+}
+
+function shipmentTypeLabel(value: ShipmentType | null): string {
+  return value === "container"
+    ? "Container"
+    : value === "loose"
+      ? "Hàng rời"
+      : "Chưa phân loại";
 }
 
 export function quantityUnitLabel(value: QuantityUnit): string {
@@ -958,6 +991,9 @@ const styles = StyleSheet.create({
   },
   looseBadge: {
     backgroundColor: colors.amberSoft
+  },
+  unspecifiedBadge: {
+    backgroundColor: colors.background
   },
   modeBadgeText: {
     color: colors.ink,
