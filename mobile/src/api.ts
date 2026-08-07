@@ -135,19 +135,21 @@ export async function importWorkbook(
   }
 
   const file = new File(asset.uri);
+  const query = new URLSearchParams({
+    ...parameters,
+    originalFilename: asset.name
+  }).toString();
   let result;
 
   for (let attempt = 0; ; attempt += 1) {
     try {
-      result = await file.upload(API_URL + "/api/imports", {
-        fieldName: "file",
+      result = await file.upload(API_URL + "/api/imports/raw?" + query, {
         headers: apiHeaders(),
         httpMethod: "POST",
         mimeType:
           asset.mimeType ??
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        parameters,
-        uploadType: UploadType.MULTIPART
+        uploadType: UploadType.BINARY_CONTENT
       });
       break;
     } catch (caught) {

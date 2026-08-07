@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import cors from "cors";
 import express, {
   type NextFunction,
@@ -348,7 +349,7 @@ app.get("/api/warehouse", async (_request, response) => {
   });
 });
 
-app.post("/api/imports", importUpload.single("file"), async (request, response) => {
+async function handleWorkbookImport(request: Request, response: Response) {
   if (!request.file) {
     response.status(400).json({ message: "Vui lòng chọn file Excel .xlsx." });
     return;
@@ -485,7 +486,47 @@ app.post("/api/imports", importUpload.single("file"), async (request, response) 
   } finally {
     client.release();
   }
-});
+}
+
+app.post("/api/imports", importUpload.single("file"), handleWorkbookImport);
+
+app.post(
+  "/api/imports/raw",
+  express.raw({ type: () => true, limit: "20mb" }),
+  async (request, response) => {
+    const originalFilename = parseImportFilename({
+      originalFilename: request.query.originalFilename
+    });
+
+    if (!/\.xlsx$/i.test(originalFilename)) {
+      throw new WorkbookImportError(
+        "Ứng dụng hiện nhận file Excel định dạng .xlsx."
+      );
+    }
+
+    if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+      throw new WorkbookImportError("File Excel không có dữ liệu.");
+    }
+
+    request.file = {
+      fieldname: "file",
+      originalname: originalFilename,
+      encoding: "7bit",
+      mimetype:
+        request.header("content-type") ??
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: request.body.length,
+      stream: Readable.from(request.body),
+      buffer: request.body,
+      destination: "",
+      filename: originalFilename,
+      path: ""
+    };
+    request.body = { ...request.query };
+
+    await handleWorkbookImport(request, response);
+  }
+);
 
 app.get("/api/imports/:id/logs", async (request, response) => {
   const status = String(request.query.status ?? "").trim();
