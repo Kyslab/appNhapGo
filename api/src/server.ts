@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 import cors from "cors";
 import express, {
@@ -24,6 +25,16 @@ import { parseVehiclePlate, VehiclePlateError } from "./intake-details.js";
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
 const expectedApiKey = process.env.APP_API_KEY?.trim();
+const webSecret = expectedApiKey || "app-nhap-go-local-development";
+const webAccessCode = createHash("sha256")
+  .update("web-access:" + webSecret)
+  .digest("hex")
+  .slice(0, 12)
+  .toUpperCase();
+const webSessionToken = createHash("sha256")
+  .update("web-session:" + webSecret)
+  .digest("hex");
+const webRoot = fileURLToPath(new URL("../web", import.meta.url));
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "*")
   .split(",")
   .map((origin) => origin.trim())
@@ -32,6 +43,45 @@ const allowedOrigins = (process.env.CORS_ORIGIN ?? "*")
 type QueryExecutor = Pick<Pool, "query"> | Pick<PoolClient, "query">;
 
 type DatabaseRow = Record<string, unknown>;
+
+function secureTextEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
+
+function cookieValue(request: Request, name: string): string | null {
+  const cookies = request.header("cookie")?.split(";") ?? [];
+
+  for (const cookie of cookies) {
+    const [key, ...valueParts] = cookie.trim().split("=");
+
+    if (key === name) {
+      return decodeURIComponent(valueParts.join("="));
+    }
+  }
+
+  return null;
+}
+
+function requireWebSession(
+  request: Request,
+  response: Response,
+  next: NextFunction
+) {
+  const session = cookieValue(request, "nhapgo_web_session");
+
+  if (session && secureTextEqual(session, webSessionToken)) {
+    next();
+    return;
+  }
+
+  response.status(401).json({ message: "Vui lòng đăng nhập trang quản lý." });
+}
 
 const importUpload = multer({
   storage: multer.memoryStorage(),
@@ -197,6 +247,50 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 
+app.get("/web/session", (request, response) => {
+  const session = cookieValue(request, "nhapgo_web_session");
+  response.setHeader("Cache-Control", "no-store");
+  response.json({
+    authenticated: Boolean(
+      session && secureTextEqual(session, webSessionToken)
+    )
+  });
+});
+
+app.post("/web/login", (request, response) => {
+  const accessCode = String(request.body?.accessCode ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (!secureTextEqual(accessCode, webAccessCode)) {
+    response.status(401).json({ message: "Mã truy cập không đúng." });
+    return;
+  }
+
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader(
+    "Set-Cookie",
+    `nhapgo_web_session=${encodeURIComponent(webSessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${secure}`
+  );
+  response.json({ message: "Đăng nhập thành công." });
+});
+
+app.post("/web/logout", (_request, response) => {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader(
+    "Set-Cookie",
+    `nhapgo_web_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`
+  );
+  response.json({ message: "Đã đăng xuất." });
+});
+
+app.use(
+  express.static(webRoot, {
+    index: "index.html",
+    maxAge: 0
+  })
+);
+
 app.get("/health", (_request, response) => {
   response.json({ ok: true, service: "app-nhap-go-api" });
 });
@@ -215,7 +309,7 @@ app.use("/api", (request, response, next) => {
   response.status(401).json({ message: "API key không hợp lệ." });
 });
 
-app.get("/api/imports", async (_request, response) => {
+async function listImports(_request: Request, response: Response) {
   const result = await pool.query(
     `
       SELECT
@@ -231,7 +325,10 @@ app.get("/api/imports", async (_request, response) => {
   );
 
   response.json({ imports: result.rows.map((row) => mapImport(row as DatabaseRow)) });
-});
+}
+
+app.get("/api/imports", listImports);
+app.get("/web-api/imports", requireWebSession, listImports);
 
 app.put("/api/imports/:id", async (request, response) => {
   const details = parseImportDetails(request.body);
@@ -518,42 +615,52 @@ async function handleWorkbookImport(request: Request, response: Response) {
 
 app.post("/api/imports", importUpload.single("file"), handleWorkbookImport);
 
+async function handleRawWorkbookImport(request: Request, response: Response) {
+  const originalFilename = parseImportFilename({
+    originalFilename: request.query.originalFilename
+  });
+
+  if (!/\.xlsx$/i.test(originalFilename)) {
+    throw new WorkbookImportError(
+      "Ứng dụng hiện nhận file Excel định dạng .xlsx."
+    );
+  }
+
+  if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
+    throw new WorkbookImportError("File Excel không có dữ liệu.");
+  }
+
+  request.file = {
+    fieldname: "file",
+    originalname: originalFilename,
+    encoding: "7bit",
+    mimetype:
+      request.header("content-type") ??
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    size: request.body.length,
+    stream: Readable.from(request.body),
+    buffer: request.body,
+    destination: "",
+    filename: originalFilename,
+    path: ""
+  };
+  request.body = { ...request.query };
+
+  await handleWorkbookImport(request, response);
+}
+
+const rawWorkbookBody = express.raw({ type: () => true, limit: "20mb" });
+
 app.post(
   "/api/imports/raw",
-  express.raw({ type: () => true, limit: "20mb" }),
-  async (request, response) => {
-    const originalFilename = parseImportFilename({
-      originalFilename: request.query.originalFilename
-    });
-
-    if (!/\.xlsx$/i.test(originalFilename)) {
-      throw new WorkbookImportError(
-        "Ứng dụng hiện nhận file Excel định dạng .xlsx."
-      );
-    }
-
-    if (!Buffer.isBuffer(request.body) || request.body.length === 0) {
-      throw new WorkbookImportError("File Excel không có dữ liệu.");
-    }
-
-    request.file = {
-      fieldname: "file",
-      originalname: originalFilename,
-      encoding: "7bit",
-      mimetype:
-        request.header("content-type") ??
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      size: request.body.length,
-      stream: Readable.from(request.body),
-      buffer: request.body,
-      destination: "",
-      filename: originalFilename,
-      path: ""
-    };
-    request.body = { ...request.query };
-
-    await handleWorkbookImport(request, response);
-  }
+  rawWorkbookBody,
+  handleRawWorkbookImport
+);
+app.post(
+  "/web-api/imports/raw",
+  requireWebSession,
+  rawWorkbookBody,
+  handleRawWorkbookImport
 );
 
 app.get("/api/imports/:id/logs", async (request, response) => {

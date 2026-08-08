@@ -18,6 +18,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/api/package.json ./api/package.json
 COPY --from=build /app/api/dist ./api/dist
 COPY --from=build /app/api/db ./api/db
+COPY --from=build /app/api/web ./api/web
 
 EXPOSE 4000
 CMD ["sh", "-c", "node api/dist/migrate.js && exec node api/dist/server.js"]

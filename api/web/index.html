@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Nhập Gỗ - Quản lý Excel</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <section class="login-shell" id="loginView" hidden>
+      <form class="login-panel" id="loginForm">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="eyebrow">NHẬP GỖ</p>
+        <h1>Quản lý Excel</h1>
+        <label for="accessCode">Mã truy cập</label>
+        <input
+          autocomplete="current-password"
+          id="accessCode"
+          maxlength="20"
+          required
+          type="password"
+        />
+        <button class="primary-button" type="submit">Đăng nhập</button>
+        <p class="form-message error-text" id="loginError" role="alert"></p>
+      </form>
+    </section>
+
+    <div id="appView" hidden>
+      <header class="app-header">
+        <div class="brand-lockup">
+          <div class="brand-mark small" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <strong>NHẬP GỖ</strong>
+            <span>Quản lý Excel</span>
+          </div>
+        </div>
+        <button class="quiet-button" id="logoutButton" type="button">Đăng xuất</button>
+      </header>
+
+      <main>
+        <section class="workspace-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">DỮ LIỆU ĐẦU VÀO</p>
+              <h1>Nhập danh sách gỗ</h1>
+            </div>
+            <span class="connection-status" id="connectionStatus">Đang kết nối</span>
+          </div>
+
+          <form id="importForm">
+            <label class="file-drop" id="fileDrop" for="excelFile">
+              <input
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                id="excelFile"
+                required
+                type="file"
+              />
+              <span class="file-action">Chọn file Excel .xlsx</span>
+              <strong id="fileName">Chưa chọn file</strong>
+              <small id="fileSize"></small>
+            </label>
+
+            <details class="optional-details">
+              <summary>Thông tin bổ sung <span>Không bắt buộc</span></summary>
+              <div class="form-grid">
+                <label>
+                  Hình thức nhập
+                  <select id="shipmentType">
+                    <option value="">Chưa chọn</option>
+                    <option value="container">Hàng Container</option>
+                    <option value="loose">Hàng rời</option>
+                  </select>
+                </label>
+                <label>
+                  Tên chủ hàng
+                  <input id="ownerName" maxlength="200" type="text" />
+                </label>
+                <label>
+                  Điện thoại liên hệ
+                  <input id="contactPhone" maxlength="30" type="tel" />
+                </label>
+                <label>
+                  Loại gỗ
+                  <input id="woodSpecies" maxlength="200" type="text" />
+                </label>
+
+                <div class="conditional-fields span-two" id="containerFields" hidden>
+                  <label>
+                    Tên lô hàng
+                    <input id="lotName" maxlength="200" type="text" />
+                  </label>
+                  <label>
+                    Nơi lấy container
+                    <input id="containerPickupLocation" maxlength="200" type="text" />
+                  </label>
+                  <label>
+                    Số Cont 20'
+                    <input id="container20Count" min="0" step="1" type="number" />
+                  </label>
+                  <label>
+                    Số Cont 40'
+                    <input id="container40Count" min="0" step="1" type="number" />
+                  </label>
+                </div>
+
+                <div class="conditional-fields span-two" id="looseFields" hidden>
+                  <label>
+                    Tên tàu
+                    <input id="vesselName" maxlength="200" type="text" />
+                  </label>
+                  <label>
+                    Nơi lấy gỗ
+                    <input id="woodPickupLocation" maxlength="200" type="text" />
+                  </label>
+                </div>
+
+                <label>
+                  Ngày bắt đầu nhập
+                  <input id="intakeStartDate" type="date" />
+                </label>
+                <label>
+                  Tổng số lượng
+                  <input id="totalQuantity" min="1" step="1" type="number" />
+                </label>
+                <label>
+                  Đơn vị
+                  <select id="quantityUnit">
+                    <option value="">Tự nhận từ Excel</option>
+                    <option value="logs">Lóng</option>
+                    <option value="packages">Kiện</option>
+                    <option value="boxes">Hộp</option>
+                  </select>
+                </label>
+                <label>
+                  Tổng khối lượng (CBM)
+                  <input
+                    id="declaredVolumeCbm"
+                    inputmode="decimal"
+                    placeholder="Ví dụ: 257,772"
+                    type="text"
+                  />
+                </label>
+              </div>
+            </details>
+
+            <div class="form-actions">
+              <button class="primary-button upload-button" id="uploadButton" type="submit">
+                Nhập dữ liệu
+              </button>
+            </div>
+          </form>
+
+          <div class="notice" id="notice" hidden role="status"></div>
+        </section>
+
+        <section class="records-band">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">DATABASE</p>
+              <h2>Danh sách đã nhập</h2>
+            </div>
+            <label class="search-field">
+              <span>Tìm kiếm</span>
+              <input id="searchInput" placeholder="Tên file, mã lô, loại gỗ" type="search" />
+            </label>
+          </div>
+
+          <div class="summary-strip" id="summaryStrip"></div>
+          <div class="records" id="records" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
